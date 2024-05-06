@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.5)
+# project(SpeedTest LANGUAGES CXX CUDA)
+
+# 设置C++标准
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_COMPILER "dlcc")
+# 设置目标GPU架构
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --cuda-gpu-arch=dlgpuc64")
+set(SDK_DIR "/dl/sdk/")
+# 根据需要设置相应的编译选项
+set(CXX_FLAGS -std=c++11 -fPIC -fpermissive -Wno-attributes)
+
+# 包含的头文件目录
+include_directories(${SDK_DIR}/include)
+include_directories(${SDK_DIR}/include/dlnne)
+link_directories(${SDK_DIR}/lib ${CMAKE_BINARY_DIR})
+
+# 生成共享库
+add_library(SpeedTest SHARED ${SOURCE_FILES})
+
+# 设置库文件的输出名称
+set_target_properties(SpeedTest PROPERTIES OUTPUT_NAME "SpeedTest")
+
+# 设置CUDA的编译选项
+target_compile_options(SpeedTest PRIVATE -I${SDK_DIR}/include -I${CMAKE_SOURCE_DIR} ${CXX_FLAGS})
