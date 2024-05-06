@@ -258,7 +258,7 @@ void addNode(const std::string& name)
 void BuildGraph()
 {
     std::map<std::string, int> in_degree;
-
+    
     //构建计算图
     for(auto& current_op : operatorMap)
     {
@@ -269,6 +269,106 @@ void BuildGraph()
         in_degree[graph_node->name] = 0;
         // 可能会在 创建依赖的时候 生成了该节点
         if(graph.find(graph_node->name) == graph.end()) addNode(graph_node->name);
+        // 记录每个计算图中节点的入度
+        for(auto& input : graph_node->inputs)
+        {
+            // 与权重,常数相关的输入
+            if(input.find("weight") != std::string::npos || 
+                input.find("bias") != std::string::npos ||
+                input.find("Constant") != std::string::npos)
+            {
+                continue;
+            }
+            
+            // 具有依赖关系的输入 "_output_"
+            std::string nodeName = getNodeName(input);
+            
+            // 更改入度
+            if(operatorMap.find(nodeName) != operatorMap.end())
+            {  
+                graph[graph_node->name].inputs.push_back(nodeName);
+                if(graph.find(nodeName) == graph.end()) addNode(nodeName);
+                graph[nodeName].dependents.push_back(graph_node->name);
+                in_degree[graph_node->name]++;
+            }
+            // 图的输入节点(并不是算子类型) vis ir
+            else
+            {   
+                addNode(nodeName);
+                in_degree[nodeName] = 0;
+                graph[nodeName].dependents.push_back(graph_node->name);
+
+                graph[graph_node->name].inputs.push_back(nodeName);
+                in_degree[graph_node->name]++;
+            }
+        }
+    }
+
+    for (const auto &id : in_degree)
+    {
+        if (graph.find(id.first) != graph.end())
+        {
+            graph[id.first].in_degree = id.second;
+        }
+    }
+    if(PRINT_GRAPH)
+    {
+        PrintGraph(graph);
     }
 }
-     
+
+void PrintGraph(std::map<std::string, graphNode> &graph)
+{
+    for (const auto &node : graph)
+    {
+        std::cout << "Node: " << node.first << "\n";
+        std::cout << "  Inputs: ";
+        for (const std::string &input : node.second.inputs)
+        {
+            std::cout << input << " ";
+        }
+        std::cout << "\n  Dependents: ";
+        for (const std::string &dependent : node.second.dependents)
+        {
+            std::cout << dependent << " ";
+        }
+        std::cout << "\n  In-degree: " << node.second.in_degree << "\n";
+    }
+}
+
+// void DFS(const std::string& node)
+// {
+//     // 0 = 未访问, 1 = 访问中, 2 = 已访问
+//     if (visited[node] == 1) {
+//         throw std::runtime_error("Detected a cycle in the graph");
+//     }
+//     if (visited[node] == 0) {
+//         visited[node] = 1;  // 标记为正在访问
+//         // 递归访问所有依赖此节点的节点
+//         for (const std::string& dependent : graph[node].dependents) {
+//             DFS(dependent);
+//         }
+//         visited[node] = 2;  // 标记为已访问
+//         topologicalOrder.push_back(node);  // 在递归返回时加入结果
+//     }
+// }
+
+// std::vector<std::string> topologicalSort()
+// {
+//     // 找出所有入度为0的节点并开始DFS
+//     std::unordered_map<std::string, int> in_degree;
+//     for (const auto& node : graph) {
+//         for (const auto& dep : node.second.dependents) {
+//             in_degree[dep]++;
+//         }
+//     }
+//     // 执行DFS仅从入度为0的节点开始
+//     for (const auto& node : graph) {
+//         if (in_degree[node.first] == 0) {
+//             DFS(node.first);
+//         }
+//     }
+//     // 由于DFS结果是逆序的，我们需要反转结果
+//     std::reverse(topologicalOrder.begin(), topologicalOrder.end());
+//     return topologicalOrder;
+// }

@@ -24,7 +24,7 @@ int main()
 
     // 拓扑排序 确定算子的执行顺序
     BuildGraph();
-    topologicalSort();
+    // topologicalSort();
 
     // 测试算子
     
