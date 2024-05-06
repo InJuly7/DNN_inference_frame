@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-../include/operator.h
+/home/firefly/Tingshuo/op_test/include/operator.h
 string
 -
 vector
@@ -14,7 +14,7 @@ vector
 map
 -
 
-../include/util.h
+/home/firefly/Tingshuo/op_test/include/util.h
 vector
 -
 string
@@ -30,19 +30,21 @@ set
 unordered_map
 -
 operator.h
-../include/operator.h
+/home/firefly/Tingshuo/op_test/include/operator.h
 
-/home/firefly/Tingshuo/op_test/src/util.cpp
+/home/firefly/Tingshuo/op_test/main.cpp
 iostream
 -
-fstream
+memory
 -
-sstream
+vector
 -
-algorithm
+map
 -
-util.h
-/home/firefly/Tingshuo/op_test/src/util.h
-algorithm
+string
 -
+./include/operator.h
+/home/firefly/Tingshuo/op_test/include/operator.h
+./include/util.h
+/home/firefly/Tingshuo/op_test/include/util.h
 

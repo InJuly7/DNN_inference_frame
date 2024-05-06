@@ -35,11 +35,11 @@ void Read_Model(std::string model_txt);
 
 void addNode(const std::string &name);
 void BuildGraph();
-// void DFS(const std::string &node);
-// void topologicalSort();
+void DFS(const std::string &node);
+void topologicalSort();
 
-void PrintGraph(std::map<std::string, graphNode> &graph);
-void PrintTopo(std::vector<std::string> sorted_order);
+void PrintGraph();
+void PrintTopo();
 
 
 

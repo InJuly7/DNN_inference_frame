@@ -7,8 +7,8 @@
 
 
 #define PRINT_OP 0
-#define PRINT_GRAPH 1
-#define PRINT_TOPO 0
+#define PRINT_GRAPH 0
+#define PRINT_TOPO 1
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
@@ -311,13 +311,14 @@ void BuildGraph()
             graph[id.first].in_degree = id.second;
         }
     }
+    
     if(PRINT_GRAPH)
     {
-        PrintGraph(graph);
+        PrintGraph();
     }
 }
 
-void PrintGraph(std::map<std::string, graphNode> &graph)
+void PrintGraph()
 {
     for (const auto &node : graph)
     {
@@ -336,39 +337,55 @@ void PrintGraph(std::map<std::string, graphNode> &graph)
     }
 }
 
-// void DFS(const std::string& node)
-// {
-//     // 0 = 未访问, 1 = 访问中, 2 = 已访问
-//     if (visited[node] == 1) {
-//         throw std::runtime_error("Detected a cycle in the graph");
-//     }
-//     if (visited[node] == 0) {
-//         visited[node] = 1;  // 标记为正在访问
-//         // 递归访问所有依赖此节点的节点
-//         for (const std::string& dependent : graph[node].dependents) {
-//             DFS(dependent);
-//         }
-//         visited[node] = 2;  // 标记为已访问
-//         topologicalOrder.push_back(node);  // 在递归返回时加入结果
-//     }
-// }
+void DFS(const std::string& node)
+{
+    // 0 = 未访问, 1 = 访问中, 2 = 已访问
+    if (visited[node] == 1)
+    {
+        std::cout<<"Detected a cycle in the graph"<<std::endl;
+    }
+    if (visited[node] == 0)
+    {
+        visited[node] = 1;  // 标记为正在访问
+        // 递归访问所有依赖此节点的节点
+        for (const std::string& dependent : graph[node].dependents)
+        {
+            DFS(dependent);
+        }
+        visited[node] = 2;  // 标记为已访问
+        topologicalOrder.push_back(node);  // 在递归返回时加入结果
+    }
+}
 
-// std::vector<std::string> topologicalSort()
-// {
-//     // 找出所有入度为0的节点并开始DFS
-//     std::unordered_map<std::string, int> in_degree;
-//     for (const auto& node : graph) {
-//         for (const auto& dep : node.second.dependents) {
-//             in_degree[dep]++;
-//         }
-//     }
-//     // 执行DFS仅从入度为0的节点开始
-//     for (const auto& node : graph) {
-//         if (in_degree[node.first] == 0) {
-//             DFS(node.first);
-//         }
-//     }
-//     // 由于DFS结果是逆序的，我们需要反转结果
-//     std::reverse(topologicalOrder.begin(), topologicalOrder.end());
-//     return topologicalOrder;
-// }
+void topologicalSort()
+{
+    // 执行DFS仅从入度为0的节点开始
+    for (const auto& node : graph)
+    {
+        if (node.second.in_degree == 0)
+        {
+            DFS(node.first);
+        }
+    }
+    // 由于DFS结果是逆序的，我们需要反转结果
+    std::reverse(topologicalOrder.begin(), topologicalOrder.end());
+
+    if(PRINT_TOPO)
+    {
+        PrintTopo();
+    }
+}
+
+void PrintTopo()
+{
+    std::cout << "Topological Order:" << std::endl;
+    for (size_t i = 0; i < topologicalOrder.size(); ++i)
+    {
+        std::cout << i + 1 << ": " << topologicalOrder[i];
+        if (i < topologicalOrder.size() - 1)
+        {
+            std::cout << " -> ";
+        }
+    }
+    std::cout << std::endl;
+}
