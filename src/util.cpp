@@ -311,7 +311,7 @@ void BuildGraph()
             graph[id.first].in_degree = id.second;
         }
     }
-    
+
     if(PRINT_GRAPH)
     {
         PrintGraph();
@@ -337,6 +337,7 @@ void PrintGraph()
     }
 }
 
+// 拓扑排序
 void DFS(const std::string& node)
 {
     // 0 = 未访问, 1 = 访问中, 2 = 已访问
@@ -389,3 +390,5 @@ void PrintTopo()
     }
     std::cout << std::endl;
 }
+
+// 构建内存池 Tensor 生命周期表

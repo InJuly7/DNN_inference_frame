@@ -21,10 +21,11 @@ int main()
 {   
     // 读取模型文件 将算子存储到operatorMap
     Read_Model(MODEL_TXT);
-
-    // 拓扑排序 确定算子的执行顺序
+    // 构建计算图
     BuildGraph();
+    // 拓扑排序 确定算子的执行顺序
     topologicalSort();
+    // 构建内存池
 
     // 测试算子
     
