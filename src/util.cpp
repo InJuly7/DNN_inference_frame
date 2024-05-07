@@ -6,9 +6,9 @@
 #include <algorithm>
 
 
-#define PRINT_OP 0
+#define PRINT_OP 1
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 1
+#define PRINT_TOPO 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
@@ -229,9 +229,9 @@ void Read_Model(std::string model_txt)
             }
             if(PRINT_OP)
             {
-                // CurrentOperator->PrintInfo();
-                // CurrentOperator->PrintAttributes();
-                CurrentOperator->PrintPara();
+                CurrentOperator->PrintInfo();
+                CurrentOperator->PrintAttributes();
+                // CurrentOperator->PrintPara();
                 std::cout<<std::endl;
             }
             
@@ -382,7 +382,7 @@ void PrintTopo()
     std::cout << "Topological Order:" << std::endl;
     for (size_t i = 0; i < topologicalOrder.size(); ++i)
     {
-        std::cout << i + 1 << ": " << topologicalOrder[i];
+        std::cout << i << ": " << topologicalOrder[i];
         if (i < topologicalOrder.size() - 1)
         {
             std::cout << " -> ";
@@ -392,3 +392,58 @@ void PrintTopo()
 }
 
 // 构建内存池 Tensor 生命周期表
+std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::vector<std::vector<int>>& inputShapes)
+{
+    auto node = operatorMap[nodeName].get();
+
+    if (node->type == "Conv")
+    {
+        op::Conv* convNode = dynamic_cast<op::Conv*>(node);
+        return calculateConvOutputShape(inputShape, convNode->kernel_shape, convNode->strides, convNode->pads, convNode->dilations);
+    }
+    else if (node->type == "Concat")
+    {
+        // Concat操作通常是沿一个特定轴合并张量
+        op::Concat* concatNode = dynamic_cast<op::Concat*>(node);
+        std::vector<int> outputShape = inputShapes[0]; // Start with the shape of the first input tensor
+        
+        // NCHW 格式 axis = 1
+        for (size_t i = 1; i < inputShapes.size(); ++i)
+        {
+            outputShape[concatNode->axis] += inputShapes[i][concatNode->axis];
+        }
+    }
+    else if (node->type == "LeakyRelu" || node->type == "Add" || node->type == "Abs")
+    {
+        // 这些操作不改变形状
+        return inputShape;
+    }
+    else if (node->type == "Slice")
+    {
+        op::Slice* sliceNode = dynamic_cast<op::Slice*>(node);
+        std::vector<int> outputShape = inputShapes[0]; 
+        int channel = (sliceNode->end_index - sliceNode->start_index - 1) / sliceNode->steps + 1;
+        outputShape[sliceNode->axis] = channel;
+        return outputShape;
+    }
+
+    // 如果没有匹配的类型，返回输入形状 (vis ir)
+    return inputShape;
+}
+
+// void InitializeTensorLifetimes()
+// {
+//     int time = 0;
+//     for (const auto& node_name : topologicalOrder)
+//     {
+//         const auto& node = operatorMap[node_name];
+//         TensorLifeSpan lifespan;
+//         lifespan.start_time = time++;
+//         lifespan.end_time = lifespan.start_time;  // 初始时，起始时间和结束时间相同
+//         lifespan.special_flag = node->special_flag;
+//         lifespan.tensor_shape = node->output_shape;
+//         lifespan.tensor_size = node->output_size;
+        
+//         tensor_lifetimes[node_name] = lifespan;
+//     }
+// }
