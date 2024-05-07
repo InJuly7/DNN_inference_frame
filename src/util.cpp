@@ -14,6 +14,7 @@ extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
 std::unordered_map<std::string, int> visited;
 extern std::vector<std::string> topologicalOrder;
+extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 
 
 std::vector<int> parseNumbers(const std::string& line)
@@ -370,7 +371,7 @@ void topologicalSort()
     }
     // 由于DFS结果是逆序的，我们需要反转结果
     std::reverse(topologicalOrder.begin(), topologicalOrder.end());
-
+    visited.clear();
     if(PRINT_TOPO)
     {
         PrintTopo();
@@ -395,17 +396,41 @@ void PrintTopo()
 std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::vector<std::vector<int>>& inputShapes)
 {
     auto node = operatorMap[nodeName].get();
+    std::vector<int> outputShape(4);
 
     if (node->type == "Conv")
     {
+        // NCHW
         op::Conv* convNode = dynamic_cast<op::Conv*>(node);
-        return calculateConvOutputShape(inputShape, convNode->kernel_shape, convNode->strides, convNode->pads, convNode->dilations);
+        
+
+        auto inputShape = inputShapes[0];
+
+        outputShape[0] = inputShape[0];
+        outputShape[2] = std::floor((inputShape[2] + 2*convNode->pads[0] - convNode->kernelShape[0]) / convNode->strides[0] + 1);
+        outputShape[3] = std::floor((inputShape[3] + 2*convNode->pads[1] - convNode->kernelShape[1]) / convNode->strides[1] + 1);
+        
+        // 检索参数权重来确定输入和输出channel
+        for (const auto& param : convNode->parameters)
+        {
+            if (param.first.find("weight") != std::string::npos)
+            {
+                weightShape = param.second.shape;
+                break;
+            }
+        }
+
+        int outputChannels = weightShape[0]; 
+        int inputChannels = weightShape[1];
+
+        outputShape[1] = outputChannels;
+        return outputShape;
     }
     else if (node->type == "Concat")
     {
         // Concat操作通常是沿一个特定轴合并张量
         op::Concat* concatNode = dynamic_cast<op::Concat*>(node);
-        std::vector<int> outputShape = inputShapes[0]; // Start with the shape of the first input tensor
+        outputShape = inputShapes[0]; // Start with the shape of the first input tensor
         
         // NCHW 格式 axis = 1
         for (size_t i = 1; i < inputShapes.size(); ++i)
@@ -421,7 +446,7 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
     else if (node->type == "Slice")
     {
         op::Slice* sliceNode = dynamic_cast<op::Slice*>(node);
-        std::vector<int> outputShape = inputShapes[0]; 
+        outputShape = inputShapes[0]; 
         int channel = (sliceNode->end_index - sliceNode->start_index - 1) / sliceNode->steps + 1;
         outputShape[sliceNode->axis] = channel;
         return outputShape;
@@ -431,19 +456,61 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
     return inputShape;
 }
 
-// void InitializeTensorLifetimes()
-// {
-//     int time = 0;
-//     for (const auto& node_name : topologicalOrder)
-//     {
-//         const auto& node = operatorMap[node_name];
-//         TensorLifeSpan lifespan;
-//         lifespan.start_time = time++;
-//         lifespan.end_time = lifespan.start_time;  // 初始时，起始时间和结束时间相同
-//         lifespan.special_flag = node->special_flag;
-//         lifespan.tensor_shape = node->output_shape;
-//         lifespan.tensor_size = node->output_size;
-        
-//         tensor_lifetimes[node_name] = lifespan;
-//     }
-// }
+void InitializeTensorLifetimes()
+{
+    int time = 0;
+    // tensor_lifetimes 索引为 算子名+"_output_0"
+    for (const auto& node_name : topologicalOrder)
+    {
+        TensorLifeSpan lifespan;
+        // 判断是否是 vis ir 图节点
+        if(graph[node_name].in_degree == 0)
+        {
+            if(node_name == "vis")
+            {
+                lifespan.start_time = time;
+                lifespan.special_flag = false;
+                // NCHW
+                lifespan.tensor_shape = {1,3,480,640};
+                lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
+            }
+            else if(node_name == "ir")
+            {
+                lifespan.start_time = time;
+                lifespan.special_flag = false;
+                // NCHW
+                lifespan.tensor_shape = {1,1,480,640};
+                lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
+            }
+            tensor_lifetimes[node_name] = lifespan;
+        }
+        else if(graph[node_name].in_degree != 0)
+        {
+            const auto& node = operatorMap[node_name];
+            tensor_lifetimes[node->outputs[0]] = lifespan;
+            for(const auto& input : node->inputs)
+            {
+                if(input.find("weight") != std::string::npos || 
+                input.find("bias") != std::string::npos ||
+                input.find("Constant") != std::string::npos)
+                {
+                    continue;
+                }
+                // 对于每一次访问到的tensor 更改end_time
+                tensor_lifetimes[input].end_time = time;
+            }
+            lifespan.start_time = time;
+            // 判断当前算子输出的依赖是否有 concat 来设置 special_flag
+            for(const auto& dependent : graph[node_name].dependents)
+            {
+                if(dependent.find("concat") != std::string::npos)
+                {
+                    lifespan.special_flag = true;
+                }
+            }
+            lifespan.tensor_shape = calculateOpOutputShape();
+            lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
+        }
+        time++;
+    }
+}

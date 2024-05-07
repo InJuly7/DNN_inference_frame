@@ -22,7 +22,7 @@ struct TensorLifeSpan {
     int start_time;  // 张量创建的时间，对应算子的执行序号
     int end_time;    // 张量最后一次被使用的时间
     bool special_flag;  // 特殊标志位，例如用于标记concat操作
-    std::vector<int> tensor_shape;
+    std::vector<int> tensor_shape(4);
     size_t tensor_size;
 };
 
