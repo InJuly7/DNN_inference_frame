@@ -13,6 +13,7 @@ struct Parameter
     std::vector<float> values;
     void setValues(const std::string& line);
 };
+
 namespace op
 {
     class Node

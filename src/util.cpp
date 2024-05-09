@@ -8,12 +8,11 @@
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 0
-#define PRINT_TENSORLIFETIMES 1
+#define PRINT_TOPO 1
+#define PRINT_TENSORLIFETIMES 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
-std::unordered_map<std::string, int> visited;
 extern std::vector<std::string> topologicalOrder;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 
@@ -340,7 +339,7 @@ void PrintGraph()
 }
 
 // 拓扑排序
-void DFS(const std::string& node)
+void DFS(const std::string& node, std::unordered_map<std::string,int>& visited)
 {
     // 0 = 未访问, 1 = 访问中, 2 = 已访问
     if (visited[node] == 1)
@@ -353,7 +352,7 @@ void DFS(const std::string& node)
         // 递归访问所有依赖此节点的节点
         for (const std::string& dependent : graph[node].dependents)
         {
-            DFS(dependent);
+            DFS(dependent, visited);
         }
         visited[node] = 2;  // 标记为已访问
         topologicalOrder.push_back(node);  // 在递归返回时加入结果
@@ -362,17 +361,17 @@ void DFS(const std::string& node)
 
 void topologicalSort()
 {
+    std::unordered_map<std::string, int> visited;
     // 执行DFS仅从入度为0的节点开始
     for (const auto& node : graph)
     {
         if (node.second.in_degree == 0)
         {
-            DFS(node.first);
+            DFS(node.first,visited);
         }
     }
     // 由于DFS结果是逆序的，我们需要反转结果
     std::reverse(topologicalOrder.begin(), topologicalOrder.end());
-    visited.clear();
     if(PRINT_TOPO)
     {
         PrintTopo();
@@ -464,6 +463,7 @@ void Initialize_LifeSpan(TensorLifeSpan& lifespan)
     lifespan.tensor_size = INFINITY;
     lifespan.tensor_shape = {-1,-1,-1,-1};
 }
+
 void BuildTensorLifetimes()
 {
     int time = 0;
@@ -493,6 +493,7 @@ void BuildTensorLifetimes()
             }
             tensor_lifetimes[node_name] = lifespan;
         }
+
         else if(graph[node_name].in_degree != 0)
         {
             const auto& node = operatorMap[node_name];
@@ -522,7 +523,6 @@ void BuildTensorLifetimes()
                 }
             }
             
-
             lifespan.tensor_shape = calculateOpOutputShape(node_name,inputShapes);
             lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
             tensor_lifetimes[node->outputs[0]] = lifespan;
@@ -535,8 +535,6 @@ void BuildTensorLifetimes()
     {
         PrintTensorLifetimes();
     }
-    
-    
 }
 
 void PrintTensorLifetimes()
@@ -560,3 +558,4 @@ void PrintTensorLifetimes()
                   << "  Tensor Size: " << lifespan.tensor_size << "\n\n";
     }
 } 
+

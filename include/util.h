@@ -38,7 +38,7 @@ void Read_Model(std::string model_txt);
 
 void addNode(const std::string &name);
 void BuildGraph();
-void DFS(const std::string &node);
+void DFS(const std::string & node, std::unordered_map<std::string,int>& visited);
 void topologicalSort();
 
 void PrintGraph();

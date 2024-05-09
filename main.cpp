@@ -16,6 +16,7 @@ std::map<std::string, graphNode> graph;
 std::vector<std::string> topologicalOrder;
 std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 
+// std::list<MemoryBlock> memoryPool;
 
 int main()
 {   
