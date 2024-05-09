@@ -6,9 +6,10 @@
 #include <algorithm>
 
 
-#define PRINT_OP 1
+#define PRINT_OP 0
 #define PRINT_GRAPH 0
 #define PRINT_TOPO 0
+#define PRINT_TENSORLIFETIMES 1
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
@@ -402,13 +403,12 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
     {
         // NCHW
         op::Conv* convNode = dynamic_cast<op::Conv*>(node);
-        
-
+        std::vector<int> weightShape;
         auto inputShape = inputShapes[0];
 
         outputShape[0] = inputShape[0];
-        outputShape[2] = std::floor((inputShape[2] + 2*convNode->pads[0] - convNode->kernelShape[0]) / convNode->strides[0] + 1);
-        outputShape[3] = std::floor((inputShape[3] + 2*convNode->pads[1] - convNode->kernelShape[1]) / convNode->strides[1] + 1);
+        outputShape[2] = std::floor((inputShape[2] + 2*convNode->pads[0] - convNode->kernel_shape[0]) / convNode->strides[0] + 1);
+        outputShape[3] = std::floor((inputShape[3] + 2*convNode->pads[1] - convNode->kernel_shape[1]) / convNode->strides[1] + 1);
         
         // 检索参数权重来确定输入和输出channel
         for (const auto& param : convNode->parameters)
@@ -431,17 +431,17 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
         // Concat操作通常是沿一个特定轴合并张量
         op::Concat* concatNode = dynamic_cast<op::Concat*>(node);
         outputShape = inputShapes[0]; // Start with the shape of the first input tensor
-        
         // NCHW 格式 axis = 1
         for (size_t i = 1; i < inputShapes.size(); ++i)
         {
             outputShape[concatNode->axis] += inputShapes[i][concatNode->axis];
         }
+        return outputShape;
     }
     else if (node->type == "LeakyRelu" || node->type == "Add" || node->type == "Abs")
     {
         // 这些操作不改变形状
-        return inputShape;
+        return inputShapes[0];
     }
     else if (node->type == "Slice")
     {
@@ -453,16 +453,25 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
     }
 
     // 如果没有匹配的类型，返回输入形状 (vis ir)
-    return inputShape;
+    return inputShapes[0];
 }
 
-void InitializeTensorLifetimes()
+void Initialize_LifeSpan(TensorLifeSpan& lifespan)
+{
+    lifespan.end_time = INFINITY;
+    lifespan.start_time = -1;
+    lifespan.special_flag = false;
+    lifespan.tensor_size = INFINITY;
+    lifespan.tensor_shape = {-1,-1,-1,-1};
+}
+void BuildTensorLifetimes()
 {
     int time = 0;
     // tensor_lifetimes 索引为 算子名+"_output_0"
     for (const auto& node_name : topologicalOrder)
     {
         TensorLifeSpan lifespan;
+        Initialize_LifeSpan(lifespan);
         // 判断是否是 vis ir 图节点
         if(graph[node_name].in_degree == 0)
         {
@@ -487,7 +496,8 @@ void InitializeTensorLifetimes()
         else if(graph[node_name].in_degree != 0)
         {
             const auto& node = operatorMap[node_name];
-            tensor_lifetimes[node->outputs[0]] = lifespan;
+            std::vector<std::vector<int>> inputShapes;
+            
             for(const auto& input : node->inputs)
             {
                 if(input.find("weight") != std::string::npos || 
@@ -498,19 +508,55 @@ void InitializeTensorLifetimes()
                 }
                 // 对于每一次访问到的tensor 更改end_time
                 tensor_lifetimes[input].end_time = time;
+                inputShapes.push_back(tensor_lifetimes[input].tensor_shape);
             }
             lifespan.start_time = time;
+            lifespan.special_flag = false;
             // 判断当前算子输出的依赖是否有 concat 来设置 special_flag
             for(const auto& dependent : graph[node_name].dependents)
             {
-                if(dependent.find("concat") != std::string::npos)
+                if(dependent.find("Concat") != std::string::npos)
                 {
                     lifespan.special_flag = true;
+                    break;
                 }
             }
-            lifespan.tensor_shape = calculateOpOutputShape();
+            
+
+            lifespan.tensor_shape = calculateOpOutputShape(node_name,inputShapes);
             lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
+            tensor_lifetimes[node->outputs[0]] = lifespan;
         }
         time++;
+        
     }
+
+    if(PRINT_TENSORLIFETIMES)
+    {
+        PrintTensorLifetimes();
+    }
+    
+    
 }
+
+void PrintTensorLifetimes()
+{
+    std::cout << "Tensor Lifetimes Information:\n";
+    for (const auto& pair : tensor_lifetimes)
+    {
+        const auto& name = pair.first;
+        const auto& lifespan = pair.second;
+        std::cout << "Tensor Name: " << name << "\n"
+                  << "  Start Time: " << lifespan.start_time << "\n"
+                  << "  End Time: " << lifespan.end_time << "\n"
+                  << "  Special Flag: " << (lifespan.special_flag ? "Yes" : "No") << "\n"
+                  << "  Tensor Shape: [";
+        for (size_t i = 0; i < lifespan.tensor_shape.size(); ++i)
+        {
+            std::cout << lifespan.tensor_shape[i];
+            if (i < lifespan.tensor_shape.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]\n"
+                  << "  Tensor Size: " << lifespan.tensor_size << "\n\n";
+    }
+} 

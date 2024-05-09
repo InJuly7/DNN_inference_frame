@@ -26,7 +26,7 @@ int main()
     // 拓扑排序 确定算子的执行顺序
     topologicalSort();
     // 构建内存池
-    
+    BuildTensorLifetimes();
 
     // 测试算子
     
