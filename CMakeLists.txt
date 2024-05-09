@@ -19,7 +19,8 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 add_executable(main
     ../src/operator.cpp
     ../src/util.cpp
-    main.cpp)  
+    ../src/memorypool.cpp
+    main.cpp)
 
 link_directories(${SDK_DIR}/lib ${CMAKE_BINARY_DIR})
 

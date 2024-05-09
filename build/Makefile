@@ -169,6 +169,33 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
 .PHONY : main.cpp.s
 
+src/memorypool.o: src/memorypool.cpp.o
+
+.PHONY : src/memorypool.o
+
+# target to build an object file
+src/memorypool.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/memorypool.cpp.o
+.PHONY : src/memorypool.cpp.o
+
+src/memorypool.i: src/memorypool.cpp.i
+
+.PHONY : src/memorypool.i
+
+# target to preprocess a source file
+src/memorypool.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/memorypool.cpp.i
+.PHONY : src/memorypool.cpp.i
+
+src/memorypool.s: src/memorypool.cpp.s
+
+.PHONY : src/memorypool.s
+
+# target to generate assembly for a file
+src/memorypool.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/memorypool.cpp.s
+.PHONY : src/memorypool.cpp.s
+
 src/operator.o: src/operator.cpp.o
 
 .PHONY : src/operator.o
@@ -235,6 +262,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... src/memorypool.o"
+	@echo "... src/memorypool.i"
+	@echo "... src/memorypool.s"
 	@echo "... src/operator.o"
 	@echo "... src/operator.i"
 	@echo "... src/operator.s"

@@ -8,7 +8,7 @@
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 1
+#define PRINT_TOPO 0
 #define PRINT_TENSORLIFETIMES 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
@@ -231,7 +231,7 @@ void Read_Model(std::string model_txt)
             if(PRINT_OP)
             {
                 CurrentOperator->PrintInfo();
-                CurrentOperator->PrintAttributes();
+                // CurrentOperator->PrintAttributes();
                 // CurrentOperator->PrintPara();
                 std::cout<<std::endl;
             }

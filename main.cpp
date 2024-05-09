@@ -3,10 +3,11 @@
 #include <vector>
 #include <map>
 #include <string>
-
+#include <list>
 
 #include "./include/operator.h"
 #include "./include/util.h"
+#include "./include/memorypool.h"
 
 #define MODEL_TXT "../model_parameters.txt"
 
@@ -16,7 +17,7 @@ std::map<std::string, graphNode> graph;
 std::vector<std::string> topologicalOrder;
 std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 
-// std::list<MemoryBlock> memoryPool;
+std::list<MemoryBlock> memoryPool;
 
 int main()
 {   
@@ -28,8 +29,7 @@ int main()
     topologicalSort();
     // 构建内存池
     BuildTensorLifetimes();
-
-    // 测试算子
+    MemoryPoolImplementation();
     
 
     return 0;
