@@ -143,7 +143,7 @@ bool canTensorBeOverwritten(const std::string& operator_name, const std::vector<
 }
 
 // 分配内存块
-void allocateMemory(size_t size, std::string tensor_name, int releaseTime)
+void allocateMemory(size_t size, std::string tensor_name)
 {
     // 已经是预分配状态的Tensor
     if(findBlockByName(tensor_name) != memoryPool.end())
@@ -157,13 +157,13 @@ void allocateMemory(size_t size, std::string tensor_name, int releaseTime)
         {  
             if (it->size > size)
             {  
-                memoryPool.insert(it, MemoryBlock(size, true, releaseTime, tensor_name)); // 在分配块时存储 tensor_name
+                memoryPool.insert(it, MemoryBlock(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name)); // 在分配块时存储 tensor_name
                 it->size -= size;
             }
             else
             {  
                 it->isAllocated = true;
-                it->releaseTime = releaseTime;
+                it->releaseTime = tensor_lifetimes[tensor_name].end_time;
                 it->tensorName = tensor_name; // 在分配块时存储 tensor_name
             }
             totalMemorySize += size; // 更新内存池总大小
@@ -171,7 +171,7 @@ void allocateMemory(size_t size, std::string tensor_name, int releaseTime)
         }
     }
 
-    memoryPool.emplace_back(size, true, releaseTime, tensor_name);
+    memoryPool.emplace_back(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name);
     totalMemorySize += size; // 更新内存池总大小
 }
 
@@ -208,34 +208,37 @@ void freeMemory(int releaseTime)
     }
 }
 
-void coverageMemory(const std::vector<std::string>& inputTensors, const std::string& outputTensor)
+void coverageMemory(const std::vector<std::string>& inputTensors, const std::string& outputTensor, )
 {
     size_t outputTensorSize = tensor_lifetimes[outputTensor].tensor_size;
 
     if (inputTensors.size() == 1)
     {
         // 单输入单输出 (如 abs, leakyrelu, slice, tanh)
-        auto blockIt = findBlockByTensorName(inputTensors[0]);
+        auto blockIt = findBlockByName(inputTensors[0]);
         if (blockIt != memoryPool.end())
         {
             if (blockIt->size == outputTensorSize)
             {
                 blockIt->tensor_name = outputTensor;  // 直接覆盖
+                blockIt->releaseTime = tensor_lifetimes[outputTensor].end_time;
             }
             else if (blockIt->size > outputTensorSize)
             {
-                // 拆分内存块，假设这里只处理更改名字和大小
+                // 拆分内存块, 简化slice 算子的操作
                 blockIt->size = outputTensorSize;
                 blockIt->tensor_name = outputTensor;
+                blockIt->releaseTime = tensor_lifetimes[outputTensor].end_time;
                 memoryPool.insert(std::next(blockIt), MemoryBlock("", false, blockIt->size - outputTensorSize));
             }
         }
     }
     
-    else if (!inputTensors.empty()) 
+    else if (inputTensors.size() > 1) 
     { 
         // 多输入单输出情形 
         size_t inputTensorTotalSize = 0;
+        // 每个输入tensor size 都与输出tensor size 匹配
         bool allMatchOutputSize = true;
 
         for (const auto& inputTensor : inputTensors)
@@ -252,11 +255,12 @@ void coverageMemory(const std::vector<std::string>& inputTensors, const std::str
         {
             // 多输入单输出 concat
             // 假设内存块已经连续
-            auto it = findBlockByTensorName(inputTensors[0]);
+            auto it = findBlockByName(inputTensors[0]);
             if (it != memoryPool.end())
             {
                 it->tensor_name = outputTensor;  // 更改第一个块的名字
                 it->size = inputTensorTotalSize;  // 调整大小为总和
+                it->releaseTime = tensor_lifetimes[outputTensor].end_time;
                 // 移除其他块
                 auto next = std::next(it);
                 while (next != memoryPool.end() && std::find(inputTensors.begin(), inputTensors.end(), next->tensor_name) != inputTensors.end())
@@ -265,23 +269,56 @@ void coverageMemory(const std::vector<std::string>& inputTensors, const std::str
                 }
             }
         }
+
         else if (allMatchOutputSize)
         {
             // 多输入单输出 (如 div, add)
-            // 覆盖到任一匹配大小的输入块，释放其他
-            for (const auto& inputTensor : inputTensors)
+            // 选择覆盖一个块，释放其他块，并使释放后的连续空闲块最大化
+            std::list<MemoryBlock>::iterator bestBlockIt = memoryPool.end();
+            size_t maxFreeSpace = 0;  // 记录最大连续空闲空间大小
+
+            // 检查每个块作为覆盖块时的最大连续空闲空间
+            for (const auto& coverCandidate : inputTensors)
             {
-                auto blockIt = findBlockByTensorName(inputTensor);
-                if (blockIt != memoryPool.end() && blockIt->size == outputTensorSize)
+                auto candidateIt = findBlockByName(coverCandidate);
+                if (candidateIt != memoryPool.end() && candidateIt->size == outputTensorSize)
                 {
-                    blockIt->tensor_name = outputTensor;  // 覆盖
-                    break;  // 停止，因为已找到覆盖点
+                    size_t currentFreeSpace = 0;
+                    // 计算假设覆盖这个块后的最大连续空闲空间
+                    // 释放除了coverCandidate 以外的所有块
+                    for (const auto& inputTensor : inputTensors)
+                    {
+                        if (inputTensor != coverCandidate)
+                        {
+                            auto blockIt = findBlockByName(inputTensor);
+                            if (blockIt != memoryPool.end())
+                            {
+                                // 假设释放这个块
+                                size_t spaceBefore = (blockIt != memoryPool.begin() && !std::prev(blockIt)->isAllocated) ? std::prev(blockIt)->size : 0;
+                                size_t spaceAfter = (std::next(blockIt) != memoryPool.end() && !std::next(blockIt)->isAllocated) ? std::next(blockIt)->size : 0;
+                                size_t totalSpace = blockIt->size + spaceBefore + spaceAfter;
+                                currentFreeSpace = std::max(currentFreeSpace, totalSpace);
+                            }
+                        }
+                    }
+                    // 如果找到了更大的连续空间，更新最佳块
+                    if (currentFreeSpace > maxFreeSpace)
+                    {
+                        maxFreeSpace = currentFreeSpace;
+                        bestBlockIt = candidateIt;
+                    }
                 }
+            }
+
+            // 执行最佳覆盖并释放其他块
+            if (bestBlockIt != memoryPool.end())
+            {
+                bestBlockIt->tensor_name = outputTensor;  // 覆盖块名
+                bestBlockIt->releaseTime = tensor_lifetimes[outputTensor].end_time;
             }
         }
     }
 }
-
 
 void printMemoryPool()
 {
