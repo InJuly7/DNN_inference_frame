@@ -16,7 +16,7 @@ std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 std::map<std::string, graphNode> graph; 
 std::vector<std::string> topologicalOrder;
 std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
-
+size_t totalMemorySize = 0;
 std::list<MemoryBlock> memoryPool;
 
 int main()

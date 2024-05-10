@@ -14,7 +14,8 @@ struct MemoryBlock
 
 void MemoryPoolImplementation();
 void processOperator(const std::string &operator_name, const std::vector<std::string> &inputTensors, const std::string &outputTensor, int current_time);
-void allocateMemory(size_t size, int releaseTime);
+void allocateMemory(size_t size, std::string tensor_name, int releaseTime);
+
 void freeMemory(int releaseTime);
 void printMemoryPool();
 
