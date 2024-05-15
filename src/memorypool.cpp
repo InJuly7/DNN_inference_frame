@@ -7,7 +7,8 @@
 #include "util.h"
 #include "memorypool.h"
 
-#define PRINT_MEMORYPOOL 1
+#define PRINT_MEMORYPOOL 0
+#define PRINT_TENSOROFFSET 1
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
@@ -15,7 +16,7 @@ extern std::map<std::string, graphNode> graph;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern size_t totalMemorySize;;
-extern std::unordered_map<std::string, size_t> tensorOffsets;
+extern std::multimap<size_t, std::string> tensorOffsets;
 
 extern std::string getNodeName(const std::string& outputName);
 
@@ -51,6 +52,7 @@ void MemoryPoolImplementation()
         }
         processOperator(operatorName, inputTensors, outputTensor,current_time);
         processOutputTensor(operatorName,outputTensor);
+        updateTensorOffsets();
         current_time++;
 
         if (PRINT_MEMORYPOOL)
@@ -58,8 +60,13 @@ void MemoryPoolImplementation()
             printMemoryPool();
         }
         
+        
         inputTensors = {};
         outputTensor = {};
+    }
+    if(PRINT_TENSOROFFSET)
+    {
+        printTensorOffsets();
     }
 
 }
@@ -74,6 +81,16 @@ std::list<MemoryBlock>::iterator findBlockByName(const std::string& name)
         }
     }
     return  memoryPool.end();
+}
+
+size_t calculateOffset(std::list<MemoryBlock>::iterator blockIt)
+{
+    size_t offset = 0;
+    for (auto it = memoryPool.begin(); it != blockIt; ++it)
+    {
+        offset += it->size;
+    }
+    return offset;
 }
 
 void processOperator(const std::string& operator_name, const std::vector<std::string>& inputTensors, const std::string& outputTensor,int current_time)
@@ -154,29 +171,39 @@ void processOutputTensor(const std::string& operator_name, const std::string& ou
                 }
             }
             if(found) break;
+            // 否则 不需要预分配
+            else return;
         }
         // 如果新块覆盖了其输入，应该使用输入的名称作为新块的名称
+        
         partner_Node = getNodeName(partner_Tensor);
         bool flag = canTensorBeOverwritten(partner_Node, graph[partner_Node].inputs,tensor_lifetimes[partner_Node].start_time);
-        if (flag)
+        
+        while(flag)
         {
             partner_Tensor = graph[partner_Node].inputs[0] + "_output_0";
+            partner_Node = getNodeName(partner_Tensor);
+            flag = canTensorBeOverwritten(partner_Node, graph[partner_Node].inputs,tensor_lifetimes[partner_Node].start_time);
         }
 
         auto blockIt = findBlockByName(outputTensor);
         if (blockIt != memoryPool.end())
         {
+            size_t insertPosition = calculateOffset(blockIt);
             // 根据index决定新块的位置
             if (index == 0)
             {
                 // 在outputTensor前面分配块
                 memoryPool.insert(blockIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size , true, tensor_lifetimes[partner_Tensor].end_time , partner_Tensor));
+                updateOffsets(insertPosition, tensor_lifetimes[partner_Tensor].tensor_size, partner_Tensor);
             }
             else if (index == 1)
             {
                 // 在outputTensor后面分配块
                 auto nextIt = std::next(blockIt);
+                size_t nextPosition = insertPosition + blockIt->size;
                 memoryPool.insert(nextIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                updateOffsets(nextPosition, tensor_lifetimes[partner_Tensor].tensor_size, partner_Tensor);
             }
         }  
     }
@@ -256,19 +283,23 @@ void allocateMemory(size_t size, std::string tensor_name)
         // 没有足够大的空闲块，找最大的空闲块并扩展
         std::list<MemoryBlock>::iterator largestFreeBlock = memoryPool.end();
         size_t largestFreeSize = 0;
-
+        size_t largestFreePosition = 0;
+        size_t current_position = 0;
         for (auto it = memoryPool.begin(); it != memoryPool.end(); ++it)
         {
             if (!it->isAllocated && it->size > largestFreeSize)
             {
                 largestFreeSize = it->size;
                 largestFreeBlock = it;
+                largestFreePosition = current_position;
             }
+            current_position += it->size;
         }
 
         if (largestFreeBlock != memoryPool.end() && !largestFreeBlock->isAllocated)
         {
             // 扩展最大的空闲块
+            updateOffsets(largestFreePosition,size-largestFreeBlock->size,tensor_name);
             largestFreeBlock->size = size; // 假设这里可以直接扩展到所需大小
             largestFreeBlock->isAllocated = true;
             largestFreeBlock->tensor_name = tensor_name;
@@ -454,17 +485,57 @@ void printMemoryPool()
     std::cout << "-------------------------------------------------------------------\n";
 }
 
-void updateOffsets(size_t insertPosition, size_t blockSize,std::string output_Tensor)
-{   
-    // 更新映射表
-    for (auto& it : tensorOffsets)
+void updateOffsets(size_t insertPosition, size_t blockSize, const std::string& outputTensor)
+{
+    std::vector<std::pair<size_t, std::string>> toBeUpdated;
+
+    // 收集需要更新的元素
+    for (auto it = tensorOffsets.lower_bound(insertPosition); it != tensorOffsets.end(); ++it)
     {
-        if(it.second >= insertPosition)
-        {
-            it.second += blockSize;
-        }
+        toBeUpdated.push_back({it->first + blockSize, it->second});
     }
-    tensorOffsets[output_Tensor] = insertPosition;
+
+    // 删除旧的元素
+    tensorOffsets.erase(tensorOffsets.lower_bound(insertPosition), tensorOffsets.end());
+
+    // 插入更新后的元素和新的Tensor
+    for (const auto& elem : toBeUpdated)
+    {
+        tensorOffsets.insert(elem);
+    }
+    
+    // 插入新的Tensor
+    tensorOffsets.insert(std::make_pair(insertPosition, outputTensor));
+}
+
+void updateTensorOffsets()
+{
+    size_t currentOffset = 0;
+
+    for (const auto& block : memoryPool)
+    {
+        if (block.isAllocated)
+        {
+            // 获取当前偏移量下的所有条目的范围
+            auto range = tensorOffsets.equal_range(currentOffset);
+            bool found = false;
+            for (auto it = range.first; it != range.second; ++it)
+            {
+                if (it->second == block.tensor_name)
+                {
+                    found = true; // 找到匹配的Tensor，无需更新
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                // 如果没有找到匹配的Tensor，添加新的条目
+                tensorOffsets.insert(std::make_pair(currentOffset, block.tensor_name));
+            }
+        }
+        currentOffset += block.size; // 更新偏移量，以包含当前块的大小
+    }
 }
 
 void printTensorOffsets()
@@ -473,7 +544,7 @@ void printTensorOffsets()
     std::cout << "---------------------\n";
     for (const auto& pair : tensorOffsets)
     {
-        std::cout << "Tensor: " << pair.first << ", Offset: " << pair.second << '\n';
+        std::cout << "Tensor: " << pair.second << ", Offset: " << pair.first << '\n';
     }
     std::cout << "---------------------\n";
 }

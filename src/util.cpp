@@ -9,7 +9,7 @@
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
 #define PRINT_TOPO 0
-#define PRINT_TENSORLIFETIMES 1
+#define PRINT_TENSORLIFETIMES 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;

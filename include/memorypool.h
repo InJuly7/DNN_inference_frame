@@ -14,6 +14,7 @@ struct MemoryBlock
 
 
 std::list<MemoryBlock>::iterator findBlockByName(const std::string &name);
+size_t calculateOffset(std::list<MemoryBlock>::iterator blockIt);
 void MemoryPoolImplementation();
 void processOperator(const std::string &operator_name, const std::vector<std::string> &inputTensors, const std::string &outputTensor, int current_time);
 bool canTensorBeOverwritten(const std::string &operator_name, const std::vector<std::string> &inputTensors, int current_time);
@@ -22,6 +23,9 @@ void allocateMemory(size_t size, std::string tensor_name);
 void freeMemory(int releaseTime);
 void coverageMemory(const std::vector<std::string> &inputTensors, const std::string &outputTensor);
 void printMemoryPool();
+void updateOffsets(size_t insertPosition, size_t blockSize, const std::string &outputTensor);
+void updateTensorOffsets();
+void printTensorOffsets();
 
 #endif // MEMORYPOOL_H
 
