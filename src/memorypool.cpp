@@ -2,19 +2,22 @@
 #include <list>
 #include <vector>
 #include <string>
-
+#include <algorithm>
 
 #include "util.h"
 #include "memorypool.h"
 
-
+#define PRINT_MEMORYPOOL 1
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
 extern std::map<std::string, graphNode> graph; 
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
-extern size_t totalMemorySize = 0;
+extern size_t totalMemorySize;;
+extern std::unordered_map<std::string, size_t> tensorOffsets;
+
+extern std::string getNodeName(const std::string& outputName);
 
 
 void MemoryPoolImplementation()
@@ -47,8 +50,14 @@ void MemoryPoolImplementation()
             outputTensor = operatorName + "_output_0";
         }
         processOperator(operatorName, inputTensors, outputTensor,current_time);
+        processOutputTensor(operatorName,outputTensor);
         current_time++;
-        // printMemoryPool();
+
+        if (PRINT_MEMORYPOOL)
+        {
+            printMemoryPool();
+        }
+        
         inputTensors = {};
         outputTensor = {};
     }
@@ -69,57 +78,113 @@ std::list<MemoryBlock>::iterator findBlockByName(const std::string& name)
 
 void processOperator(const std::string& operator_name, const std::vector<std::string>& inputTensors, const std::string& outputTensor,int current_time)
 {
-    // std::cout<<operator_name<<std::endl;
-    // for(const auto& inputTensor : inputTensors)
-    // {
-    //     std::cout<<inputTensor<<" ";
-    // }
-    // std::cout<<std::endl;
-    // std::cout<<outputTensor<<std::endl;
-
     // 图输入节点
     if(graph[operator_name].in_degree == 0)
     {
-        allocateMemory(tensor_lifetimes[operator_name].tensor_size,operator_name,tensor_lifetimes[operator_name].end_time);
+        allocateMemory(tensor_lifetimes[outputTensor].tensor_size,outputTensor);
         return;
     }
 
     // 不需要执行的 算子节点 concat 
     else if(operatorMap[operator_name]->type == "Concat")
     {
-        return ;
+        coverageMemory(inputTensors,outputTensor);
     }
-
     
     else if(canTensorBeOverwritten(operator_name,inputTensors,current_time))
     {
         // 需要执行的可覆盖算子节点, 每次执行完都需要考虑释放块的问题
         if(operatorMap[operator_name]->type == "Slice")
         {
-
+            coverageMemory(inputTensors,outputTensor);
         }
         // 单输入 直接覆盖
         else if(operatorMap[operator_name]->type == "LeakyRelu" || 
                 operatorMap[operator_name]->type == "Abs" || 
                 operatorMap[operator_name]->type == "Tanh")
         {
-
+            coverageMemory(inputTensors,outputTensor);
         }
 
-
-
-
+        else if(operatorMap[operator_name]->type == "Add" || 
+                operatorMap[operator_name]->type == "Div")
+        {
+            coverageMemory(inputTensors,outputTensor);
+        }
 
         freeMemory(current_time);
     }
-    else
+    else if (operatorMap[operator_name]->type == "Conv")
     {
-
+        allocateMemory(tensor_lifetimes[outputTensor].tensor_size,outputTensor);
+        freeMemory(current_time);
     }
 
 
 }
 
+void processOutputTensor(const std::string& operator_name, const std::string& outputTensor)
+{
+    std::string partner_Tensor = {};
+    std::string partner_Node = {};
+    int index = -1; 
+    bool found = false;
+
+    // 输出Tensor 的依赖是concat 算子
+    if(tensor_lifetimes[outputTensor].special_flag == true)
+    {
+        // 是否执行预分配 
+        // 内存池中没有 concat输入Tensor
+        for(const auto& dependent : graph[operator_name].dependents)
+        {
+            if(operatorMap[dependent]->type == "Concat")
+            {
+                for(index = 0; index < operatorMap[dependent]->inputs.size(); index++)
+                {
+                    if(operatorMap[dependent]->inputs[index] != outputTensor )
+                    {
+                        partner_Tensor = operatorMap[dependent]->inputs[index];
+                        if(tensor_lifetimes[partner_Tensor].start_time > tensor_lifetimes[outputTensor].start_time)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                        
+                }
+            }
+            if(found) break;
+        }
+        // 如果新块覆盖了其输入，应该使用输入的名称作为新块的名称
+        partner_Node = getNodeName(partner_Tensor);
+        bool flag = canTensorBeOverwritten(partner_Node, graph[partner_Node].inputs,tensor_lifetimes[partner_Node].start_time);
+        if (flag)
+        {
+            partner_Tensor = graph[partner_Node].inputs[0] + "_output_0";
+        }
+
+        auto blockIt = findBlockByName(outputTensor);
+        if (blockIt != memoryPool.end())
+        {
+            // 根据index决定新块的位置
+            if (index == 0)
+            {
+                // 在outputTensor前面分配块
+                memoryPool.insert(blockIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size , true, tensor_lifetimes[partner_Tensor].end_time , partner_Tensor));
+            }
+            else if (index == 1)
+            {
+                // 在outputTensor后面分配块
+                auto nextIt = std::next(blockIt);
+                memoryPool.insert(nextIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+            }
+        }  
+    }
+    else
+    {
+        return ;
+    }
+}
 
 bool canTensorBeOverwritten(const std::string& operator_name, const std::vector<std::string>& inputTensors, int current_time)
 {
@@ -135,7 +200,7 @@ bool canTensorBeOverwritten(const std::string& operator_name, const std::vector<
         for (const auto& inputTensor : inputTensors)
         {
             if(tensor_lifetimes[inputTensor].end_time > current_time)
-            return false
+            return false;
         }
         // 弱依赖算子的输入Tensor为单依赖情形
         return true;
@@ -145,34 +210,76 @@ bool canTensorBeOverwritten(const std::string& operator_name, const std::vector<
 // 分配内存块
 void allocateMemory(size_t size, std::string tensor_name)
 {
-    // 已经是预分配状态的Tensor
+    // 检查是否已经分配
     if(findBlockByName(tensor_name) != memoryPool.end())
     {
         return;
     }
-    
+
+    // 查找最合适的空闲块
+    auto bestFit = memoryPool.end();
+    size_t minSizeDiff = std::numeric_limits<size_t>::max();
+
     for (auto it = memoryPool.begin(); it != memoryPool.end(); ++it)
     {
         if (!it->isAllocated && it->size >= size)
-        {  
-            if (it->size > size)
-            {  
-                memoryPool.insert(it, MemoryBlock(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name)); // 在分配块时存储 tensor_name
-                it->size -= size;
+        {
+            size_t sizeDiff = it->size - size;
+            if (sizeDiff < minSizeDiff)
+            {
+                minSizeDiff = sizeDiff;
+                bestFit = it;
+                if (sizeDiff == 0) break; // 完美匹配，直接结束查找
             }
-            else
-            {  
-                it->isAllocated = true;
-                it->releaseTime = tensor_lifetimes[tensor_name].end_time;
-                it->tensorName = tensor_name; // 在分配块时存储 tensor_name
-            }
-            totalMemorySize += size; // 更新内存池总大小
-            return;
         }
     }
 
-    memoryPool.emplace_back(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name);
-    totalMemorySize += size; // 更新内存池总大小
+    if (bestFit != memoryPool.end())
+    {
+        // 发现适合的空闲块
+        if (bestFit->size > size)
+        {
+            // 拆分块
+            memoryPool.insert(bestFit, MemoryBlock(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name));
+            bestFit->size -= size;
+        }
+        else
+        {
+            // 大小完全匹配，直接使用
+            bestFit->isAllocated = true;
+            bestFit->tensor_name = tensor_name;
+            bestFit->releaseTime = tensor_lifetimes[tensor_name].end_time;
+        }
+    }
+    else
+    {
+        // 没有足够大的空闲块，找最大的空闲块并扩展
+        std::list<MemoryBlock>::iterator largestFreeBlock = memoryPool.end();
+        size_t largestFreeSize = 0;
+
+        for (auto it = memoryPool.begin(); it != memoryPool.end(); ++it)
+        {
+            if (!it->isAllocated && it->size > largestFreeSize)
+            {
+                largestFreeSize = it->size;
+                largestFreeBlock = it;
+            }
+        }
+
+        if (largestFreeBlock != memoryPool.end() && !largestFreeBlock->isAllocated)
+        {
+            // 扩展最大的空闲块
+            largestFreeBlock->size = size; // 假设这里可以直接扩展到所需大小
+            largestFreeBlock->isAllocated = true;
+            largestFreeBlock->tensor_name = tensor_name;
+            largestFreeBlock->releaseTime = tensor_lifetimes[tensor_name].end_time;
+        }
+        else
+        {
+            // 如果所有块都已分配，或找不到空闲块，则新建块
+            memoryPool.emplace_back(size, true, tensor_lifetimes[tensor_name].end_time, tensor_name);
+        }
+    }
 }
 
 // 释放内存块
@@ -208,7 +315,7 @@ void freeMemory(int releaseTime)
     }
 }
 
-void coverageMemory(const std::vector<std::string>& inputTensors, const std::string& outputTensor, )
+void coverageMemory(const std::vector<std::string>& inputTensors, const std::string& outputTensor)
 {
     size_t outputTensorSize = tensor_lifetimes[outputTensor].tensor_size;
 
@@ -225,11 +332,12 @@ void coverageMemory(const std::vector<std::string>& inputTensors, const std::str
             }
             else if (blockIt->size > outputTensorSize)
             {
+                size_t block_size = blockIt->size;
                 // 拆分内存块, 简化slice 算子的操作
                 blockIt->size = outputTensorSize;
                 blockIt->tensor_name = outputTensor;
                 blockIt->releaseTime = tensor_lifetimes[outputTensor].end_time;
-                memoryPool.insert(std::next(blockIt), MemoryBlock("", false, blockIt->size - outputTensorSize));
+                memoryPool.insert(std::next(blockIt), MemoryBlock(block_size-outputTensorSize, false));
             }
         }
     }
@@ -258,14 +366,13 @@ void coverageMemory(const std::vector<std::string>& inputTensors, const std::str
             auto it = findBlockByName(inputTensors[0]);
             if (it != memoryPool.end())
             {
-                it->tensor_name = outputTensor;  // 更改第一个块的名字
-                it->size = inputTensorTotalSize;  // 调整大小为总和
                 it->releaseTime = tensor_lifetimes[outputTensor].end_time;
-                // 移除其他块
+                // 更改concat的其余输入的Tensor的 end_time
                 auto next = std::next(it);
                 while (next != memoryPool.end() && std::find(inputTensors.begin(), inputTensors.end(), next->tensor_name) != inputTensors.end())
                 {
-                    next = memoryPool.erase(next);  // 删除其他相关块
+                    next->releaseTime = tensor_lifetimes[outputTensor].end_time;
+                    next = std::next(next);
                 }
             }
         }
@@ -345,4 +452,28 @@ void printMemoryPool()
     }
     
     std::cout << "-------------------------------------------------------------------\n";
+}
+
+void updateOffsets(size_t insertPosition, size_t blockSize,std::string output_Tensor)
+{   
+    // 更新映射表
+    for (auto& it : tensorOffsets)
+    {
+        if(it.second >= insertPosition)
+        {
+            it.second += blockSize;
+        }
+    }
+    tensorOffsets[output_Tensor] = insertPosition;
+}
+
+void printTensorOffsets()
+{
+    std::cout << "Tensor Offsets:\n";
+    std::cout << "---------------------\n";
+    for (const auto& pair : tensorOffsets)
+    {
+        std::cout << "Tensor: " << pair.first << ", Offset: " << pair.second << '\n';
+    }
+    std::cout << "---------------------\n";
 }
