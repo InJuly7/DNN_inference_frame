@@ -8,7 +8,7 @@
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 0
+#define PRINT_TOPO 1
 #define PRINT_TENSORLIFETIMES 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
@@ -92,18 +92,20 @@ void ConstInput(op::Node& operatorNode)
         {
             slice_Ptr->SetAttributesFromFile();
         }
-        else
-        {
-            std::cerr << "Failed to cast operatorNode to op::Slice type." << std::endl;
-        }
     }
     else if(operatorNode.type == "Add")
     {
-
+        if (auto add_Ptr = dynamic_cast<op::Add*>(&operatorNode))
+        {
+            add_Ptr->SetAttributesFromFile();
+        }
     }
     else if(operatorNode.type == "Div")
     {
-
+        if (auto div_Ptr = dynamic_cast<op::Div*>(&operatorNode))
+        {   
+            div_Ptr->SetAttributesFromFile();
+        }
     }
 
 }
@@ -139,6 +141,14 @@ std::unique_ptr<op::Node>CreateOperator(const std::string& operatorType,const st
     else if(operatorType == "Abs")
     {
         return std::make_unique<op::Abs>(operatorType,operatorName);
+    }
+    else if(operatorType == "Tanh")
+    {
+        return std::make_unique<op::Tanh>(operatorType,operatorName);
+    }
+    else if(operatorType == "Div")
+    {
+        return std::make_unique<op::Div>(operatorType,operatorName);
     }
     else
     {
@@ -231,8 +241,8 @@ void Read_Model(std::string model_txt)
             if(PRINT_OP)
             {
                 CurrentOperator->PrintInfo();
-                // CurrentOperator->PrintAttributes();
-                // CurrentOperator->PrintPara();
+                CurrentOperator->PrintAttributes();
+                CurrentOperator->PrintPara();
                 std::cout<<std::endl;
             }
             

@@ -45,7 +45,8 @@ def attribute_to_string(attribute):
 
 
 # 加载ONNX模型
-model_path = 'part_11_5.onnx'
+# model_path = 'part_11_5.onnx'
+model_path = "fusion11_5.onnx"
 model = onnx.load(model_path)
 
 # 提取并保存模型中所有算子的信息

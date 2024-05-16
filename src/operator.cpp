@@ -233,13 +233,13 @@ void op::Constant::SetAttributesFromFile(std::string line)
         iss >> constant_value_str;
         for (char c : constant_value_str)
         {   
-            if (isdigit(c) || c == ' ' || c == ',' || c == '-')
+            if (isdigit(c) || c == ' ' || c == '.' || c == '-')
             {
                 cleanString += c;
             }
         }
         cleanString.erase(std::remove_if(cleanString.begin(), cleanString.end(), ::isspace), cleanString.end());
-        constant_value = std::stoi(cleanString);
+        constant_value = std::stof(cleanString);
     }
 }
 
@@ -339,29 +339,6 @@ void op::Concat::PrintAttributes()
     std::cout<<"axis "<<axis<<std::endl;
 }
 
-// Add
-
-op::Add::Add(std::string Node_type, std::string Node_name)
-{
-    this->name = Node_name;
-    this->type = Node_type;
-    // std::cout<<"Creating "<<" "<<this->type<<" "<<"operator"<<"  "<<this->name<<std::endl;
-}
-
-void op::Add::SetAttributesFromFile(std::string line)
-{
-
-}
-
-void op::Add::Execute()
-{
-    std::cout<<"This is a Constant operator's Implementation"<<std::endl;
-}
-
-void op::Add::PrintAttributes()
-{
-
-}
 
 // Abs
 
@@ -379,10 +356,117 @@ void op::Abs::SetAttributesFromFile(std::string line)
 
 void op::Abs::Execute()
 {
-    std::cout<<"This is a Constant operator's Implementation"<<std::endl;
+    std::cout<<"This is a Abs operator's Implementation"<<std::endl;
 }
 
 void op::Abs::PrintAttributes()
 {
 
+}
+
+// Tanh
+
+op::Tanh::Tanh(std::string Node_type, std::string Node_name)
+{
+    this->name = Node_name;
+    this->type = Node_type;
+}
+
+void op::Tanh::SetAttributesFromFile(std::string line)
+{
+
+}
+
+void op::Tanh::Execute()
+{
+    std::cout<<"This is a Tanh operator's Implementation"<<std::endl;
+}
+
+void op::Tanh::PrintAttributes()
+{
+
+}
+
+// Div
+
+op::Div::Div(std::string Node_type, std::string Node_name)
+{
+    this->name = Node_name;
+    this->type = Node_type;
+}
+
+void op::Div::SetAttributesFromFile()
+{
+    std::string div_value_str = {};
+    if(inputs.size() == 2)
+    {
+        
+        for(int i = 0; i < 2; i++)
+        {
+            if(inputs[i].find("Constant") != std::string::npos)
+            {
+                div_value_str = getNodeName(inputs[i]);
+                break;
+            }
+        }
+    }
+    if(!div_value_str.empty())
+    {
+        auto& Node_op_0 = operatorMap[div_value_str];
+        auto constant_Ptr = dynamic_cast<op::Constant*>(Node_op_0.get());
+        div_value = constant_Ptr->constant_value;
+    }
+}
+
+void op::Div::Execute()
+{
+    std::cout<<"This is a Div operator's Implementation"<<std::endl;
+}
+
+void op::Div::PrintAttributes()
+{
+    std::cout<<"----- "<<name<<" Attribute -----"<<std::endl;
+    std::cout<<"Div_constant "<<div_value<<std::endl;
+}
+
+// Add
+
+op::Add::Add(std::string Node_type, std::string Node_name)
+{
+    this->name = Node_name;
+    this->type = Node_type;
+    // std::cout<<"Creating "<<" "<<this->type<<" "<<"operator"<<"  "<<this->name<<std::endl;
+}
+
+void op::Add::SetAttributesFromFile()
+{
+    std::string add_value_str = {};
+    if(inputs.size() == 2)
+    {
+        for(int i = 0; i < 2; i++)
+        {
+            if(inputs[i].find("Constant") != std::string::npos)
+            {
+                add_value_str = getNodeName(inputs[i]);
+                break;
+            }
+        }
+    }
+    if(!add_value_str.empty())
+    {
+        auto& Node_op_0 = operatorMap[add_value_str];
+        auto constant_Ptr = dynamic_cast<op::Constant*>(Node_op_0.get());
+        add_value = constant_Ptr->constant_value;
+    }
+}
+
+void op::Add::Execute()
+{
+    std::cout<<"This is a Add operator's Implementation"<<std::endl;
+}
+
+void op::Add::PrintAttributes()
+{
+    std::cout<<"----- "<<name<<" Attribute -----"<<std::endl;
+    std::cout<<"Add_constant "<<add_value<<std::endl;
 }

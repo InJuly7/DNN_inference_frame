@@ -92,16 +92,6 @@ namespace op
             void Execute() override;
             void PrintAttributes() override;
     };
-    class Add : public Node
-    {
-        public:
-            float add_value;
-
-            Add(std::string Node_type,std::string Node_name);
-            void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
-            void PrintAttributes() override;
-    };
     class Abs : public Node
     {
         public:
@@ -110,8 +100,34 @@ namespace op
             void Execute() override;
             void PrintAttributes() override;
     };
+    class Tanh : public Node
+    {
+        public:
+            Tanh(std::string Node_type,std::string Node_name);
+            void SetAttributesFromFile(std::string line) override;
+            void Execute() override;
+            void PrintAttributes() override;
+    };
+    class Add : public Node
+    {
+        public:
+            float add_value;
 
+            Add(std::string Node_type,std::string Node_name);
+            void SetAttributesFromFile();
+            void Execute() override;
+            void PrintAttributes() override;
+    };
+    class Div : public Node
+    {
+        public:
+            float div_value;
 
+            Div(std::string Node_type,std::string Node_name);
+            void SetAttributesFromFile();
+            void Execute() override;
+            void PrintAttributes() override;
+    };
 };
 
 #endif // OPERATORS_H
