@@ -8,7 +8,7 @@
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 1
+#define PRINT_TOPO 0
 #define PRINT_TENSORLIFETIMES 0
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
@@ -56,7 +56,7 @@ std::vector<float> parseFloats(const std::string& line)
     std::string cleanString;
     for (char c : line)
     {   
-        if (isdigit(c) || c == ' ' || c == ',' || c == '-' || c == '.')
+        if (isdigit(c) || c == ' ' || c == ',' || c == '-' || c == '.' || c == 'e')
         {
             cleanString += c;
         }
@@ -194,6 +194,7 @@ void Read_Model(std::string model_txt)
             currentOperatorType = line.substr(colonPos+5);
             currentOperatorType.erase(0, currentOperatorType.find_first_not_of(" \t"));
             operatorMap[Node_name] = CreateOperator(currentOperatorType,Node_name);
+
         }
         else if((key == "Inputs:")||(key == "Outputs:"))
         {
@@ -275,11 +276,24 @@ void BuildGraph()
     {
         op::Node* graph_node = current_op.second.get();
         if(graph_node->type == "Constant") continue; 
-
         // 非 constant 算子 都加入计算图
         in_degree[graph_node->name] = 0;
         // 可能会在 创建依赖的时候 生成了该节点
         if(graph.find(graph_node->name) == graph.end()) addNode(graph_node->name);
+        // 创建图输出节点
+        if((graph_node->outputs[0] != graph_node->name+"_output_0"))
+        {
+            auto output_Node = graph_node->outputs[0];
+            if(graph.find(graph_node->outputs[0]) == graph.end())
+            {
+                addNode(output_Node);
+                in_degree[output_Node] = 0;
+            }
+            graph[output_Node].inputs.push_back(graph_node->name);
+            graph[graph_node->name].dependents.push_back(output_Node);
+            in_degree[output_Node]++;
+        }
+        
         // 记录每个计算图中节点的入度
         for(auto& input : graph_node->inputs)
         {
@@ -302,6 +316,7 @@ void BuildGraph()
                 graph[nodeName].dependents.push_back(graph_node->name);
                 in_degree[graph_node->name]++;
             }
+
             // 图的输入节点(并不是算子类型) vis ir
             else
             {   
@@ -447,7 +462,7 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
         }
         return outputShape;
     }
-    else if (node->type == "LeakyRelu" || node->type == "Add" || node->type == "Abs")
+    else if (node->type == "LeakyRelu" || node->type == "Add" || node->type == "Abs" || node->type == "Div" || node->type == "Tanh")
     {
         // 这些操作不改变形状
         return inputShapes[0];
@@ -506,6 +521,10 @@ void BuildTensorLifetimes()
 
         else if(graph[node_name].in_degree != 0)
         {
+            if (graph[node_name].dependents.empty())
+            {    
+                continue;
+            }
             const auto& node = operatorMap[node_name];
             std::vector<std::vector<int>> inputShapes;
             

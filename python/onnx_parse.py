@@ -18,7 +18,8 @@ def tensor_to_string(tensor):
         return "[]"
 
     param = param.reshape(tuple(tensor.dims))  # Reshape according to the dimensions
-    return np.array2string(param, separator=',').replace('\n', '')
+    np.set_printoptions(threshold=np.inf)  # 设置显示整个数组，无省略
+    return np.array2string(param, separator=',', precision=6).replace('\n', '')
 
 def attribute_to_string(attribute):
     # This function will handle different types of attribute values

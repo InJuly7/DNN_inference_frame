@@ -7,8 +7,8 @@
 #include "util.h"
 #include "memorypool.h"
 
-#define PRINT_MEMORYPOOL 0
-#define PRINT_TENSOROFFSET 1
+#define PRINT_MEMORYPOOL 1
+#define PRINT_TENSOROFFSET 0
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
@@ -34,6 +34,10 @@ void MemoryPoolImplementation()
             inputTensors = {};
             outputTensor = operatorName;
         }
+        else if(graph[operatorName].dependents.empty())
+        {
+            continue;
+        }
         else
         {
             for(int i = 0; i < graph[operatorName].in_degree;i++)
@@ -48,7 +52,7 @@ void MemoryPoolImplementation()
                 }
                 
             }
-            outputTensor = operatorName + "_output_0";
+            outputTensor = operatorMap[operatorName]->outputs[0];
         }
         processOperator(operatorName, inputTensors, outputTensor,current_time);
         processOutputTensor(operatorName,outputTensor);
@@ -59,7 +63,6 @@ void MemoryPoolImplementation()
         {
             printMemoryPool();
         }
-        
         
         inputTensors = {};
         outputTensor = {};
@@ -353,6 +356,7 @@ void coverageMemory(const std::vector<std::string>& inputTensors, const std::str
     if (inputTensors.size() == 1)
     {
         // 单输入单输出 (如 abs, leakyrelu, slice, tanh)
+        // 常数输入 add div
         auto blockIt = findBlockByName(inputTensors[0]);
         if (blockIt != memoryPool.end())
         {

@@ -173,7 +173,6 @@ void Parameter::setValues(const std::string& line)
     // parse parameter
     para_substr = line.substr(para_pos);
     values = parseFloats(para_substr);
-
 }
 
 void op::Conv::Execute()
