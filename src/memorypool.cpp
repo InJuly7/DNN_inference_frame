@@ -143,13 +143,12 @@ void processOperator(const std::string& operator_name, const std::vector<std::st
 
 }
 
-void processOutputTensor(const std::string& operator_name, const std::string& outputTensor)
+void processOutputTensor(const std::string& operator_name, std::string outputTensor)
 {
     std::string partner_Tensor = {};
     std::string partner_Node = {};
     int index = -1; 
     bool found = false;
-
     // 输出Tensor 的依赖是concat 算子
     if(tensor_lifetimes[outputTensor].special_flag == true)
     {
@@ -170,7 +169,6 @@ void processOutputTensor(const std::string& operator_name, const std::string& ou
                             break;
                         }
                     }
-                        
                 }
             }
             if(found) break;
@@ -178,10 +176,8 @@ void processOutputTensor(const std::string& operator_name, const std::string& ou
             else return;
         }
         // 如果新块覆盖了其输入，应该使用输入的名称作为新块的名称
-        
         partner_Node = getNodeName(partner_Tensor);
         bool flag = canTensorBeOverwritten(partner_Node, graph[partner_Node].inputs,tensor_lifetimes[partner_Node].start_time);
-        
         while(flag)
         {
             partner_Tensor = graph[partner_Node].inputs[0] + "_output_0";
@@ -189,26 +185,119 @@ void processOutputTensor(const std::string& operator_name, const std::string& ou
             flag = canTensorBeOverwritten(partner_Node, graph[partner_Node].inputs,tensor_lifetimes[partner_Node].start_time);
         }
 
+        //如果输出Tensor是由concat算子产生的 
+        //在内存视角看不到该输出Tensor_name 只能看到拼接而成的子Tensor_name
+        if (operatorMap[getNodeName(outputTensor)]->type == "Concat")
+        {
+            int i ;
+            if(index == 0) i = 0;
+            else i = operatorMap[getNodeName(outputTensor)]->inputs.size()-1;
+            outputTensor = operatorMap[getNodeName(outputTensor)]->inputs[i];
+        }
+        
         auto blockIt = findBlockByName(outputTensor);
+        
         if (blockIt != memoryPool.end())
         {
             size_t insertPosition = calculateOffset(blockIt);
+            size_t partner_tensor_size = tensor_lifetimes[partner_Tensor].tensor_size;
             // 根据index决定新块的位置
             if (index == 0)
             {
                 // 在outputTensor前面分配块
-                memoryPool.insert(blockIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size , true, tensor_lifetimes[partner_Tensor].end_time , partner_Tensor));
-                updateOffsets(insertPosition, tensor_lifetimes[partner_Tensor].tensor_size, partner_Tensor);
+                if (blockIt != memoryPool.begin())
+                {
+                    auto prevIt = std::prev(blockIt);
+                    if (prevIt->isAllocated)
+                    {
+                        // 插入新块
+                        memoryPool.insert(prevIt, MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                        updateOffsets(insertPosition, partner_tensor_size, partner_Tensor);
+                    }
+                    else
+                    {
+                        // 拆分前面的块 不需要 updateOffset
+                        if (prevIt->size > partner_tensor_size)
+                        {
+                            // 拆分块
+                            memoryPool.insert(prevIt, MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                            prevIt->size -= partner_tensor_size;
+                        }
+
+                        // 不需要 updateoffset
+                        else if (prevIt->size = partner_tensor_size)
+                        {   
+                            prevIt->isAllocated = true;
+                            prevIt->releaseTime = tensor_lifetimes[partner_Tensor].end_time;
+                            prevIt->tensor_name = partner_Tensor;
+                        }
+                        // 扩展空闲块 需要updateoffset 
+                        else if (prevIt->size < partner_tensor_size)
+                        {
+                            updateOffsets(insertPosition,partner_tensor_size-prevIt->size, partner_Tensor);
+                            prevIt->isAllocated = true;
+                            prevIt->releaseTime = tensor_lifetimes[partner_Tensor].end_time;
+                            prevIt->tensor_name = partner_Tensor;
+                            prevIt->size = partner_tensor_size;
+                        }
+                    }
+                }
+                // blockIt 为首块
+                else if(blockIt == memoryPool.begin())
+                {
+                    memoryPool.push_front(MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                    updateOffsets(0, partner_tensor_size, partner_Tensor);
+                }
             }
-            else if (index == 1)
+            if (index == 1)
             {
                 // 在outputTensor后面分配块
                 auto nextIt = std::next(blockIt);
-                size_t nextPosition = insertPosition + blockIt->size;
-                memoryPool.insert(nextIt, MemoryBlock(tensor_lifetimes[partner_Tensor].tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
-                updateOffsets(nextPosition, tensor_lifetimes[partner_Tensor].tensor_size, partner_Tensor);
-            }
-        }  
+                size_t nextPosition = insertPosition + blockIt->size; // 计算新块的插入位置
+
+                if(nextIt != memoryPool.end())
+                {
+                    if(!nextIt->isAllocated)
+                    {
+                        // 空闲块存在，根据大小决定操作
+                        if(nextIt->size > partner_tensor_size)
+                        {
+                            // 空闲块大于所需大小，拆分空闲块，使用前部
+                            memoryPool.insert(nextIt, MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                            nextIt->size -= partner_tensor_size;  // 缩减现有空闲块大小
+                        }
+                        else if(nextIt->size == partner_tensor_size)
+                        {
+                            // 空闲块与所需大小完全匹配，直接使用
+                            nextIt->isAllocated = true;
+                            nextIt->releaseTime = tensor_lifetimes[partner_Tensor].end_time;
+                            nextIt->tensor_name = partner_Tensor;
+                        }
+                        else
+                        {
+                            // 空闲块小于所需大小，扩展空闲块
+                            size_t extra_size = partner_tensor_size - nextIt->size;
+                            updateOffsets(nextPosition, extra_size, partner_Tensor);
+                            nextIt->isAllocated = true;
+                            nextIt->releaseTime = tensor_lifetimes[partner_Tensor].end_time;
+                            nextIt->tensor_name = partner_Tensor;
+                            nextIt->size = partner_tensor_size;
+                        }
+                    }
+                    else
+                    {
+                        // 下一个块已分配，直接在其前面插入新块
+                        memoryPool.insert(nextIt, MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                        updateOffsets(nextPosition, partner_tensor_size, partner_Tensor);
+                    }
+                }
+                else if(nextIt == memoryPool.end())
+                {
+                    memoryPool.push_back(MemoryBlock(partner_tensor_size, true, tensor_lifetimes[partner_Tensor].end_time, partner_Tensor));
+                    updateOffsets(nextPosition, partner_tensor_size, partner_Tensor);  // 更新偏移量
+                }
+            }   
+        }
     }
     else
     {
@@ -472,7 +561,7 @@ void printMemoryPool()
     for (const auto& block : memoryPool)
     {
         std::cout << "| " << (block.isAllocated ? "Yes" : "No ")
-                  << "       | " << block.size
+                  << "       | " << block.size/307200
                   << "          | ";
         if (block.releaseTime == -1)
         {
@@ -548,7 +637,7 @@ void printTensorOffsets()
     std::cout << "---------------------\n";
     for (const auto& pair : tensorOffsets)
     {
-        std::cout << "Tensor: " << pair.second << ", Offset: " << pair.first << '\n';
+        std::cout << "Tensor: " << pair.second << ", Offset: " << pair.first/307200 << '\n';
     }
     std::cout << "---------------------\n";
 }

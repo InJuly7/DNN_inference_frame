@@ -520,7 +520,8 @@ void BuildTensorLifetimes()
         }
 
         else if(graph[node_name].in_degree != 0)
-        {
+        {   
+            
             if (graph[node_name].dependents.empty())
             {    
                 continue;
