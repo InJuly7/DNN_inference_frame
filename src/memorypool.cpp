@@ -7,7 +7,7 @@
 #include "util.h"
 #include "memorypool.h"
 
-#define PRINT_MEMORYPOOL 1
+#define PRINT_MEMORYPOOL 0
 #define PRINT_TENSOROFFSET 0
 
 extern std::list<MemoryBlock> memoryPool;
@@ -15,8 +15,10 @@ extern std::vector<std::string> topologicalOrder;
 extern std::map<std::string, graphNode> graph; 
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
-extern size_t totalMemorySize;;
+extern size_t totalMemorySize;
 extern std::multimap<size_t, std::string> tensorOffsets;
+
+
 
 extern std::string getNodeName(const std::string& outputName);
 
@@ -56,6 +58,7 @@ void MemoryPoolImplementation()
         }
         processOperator(operatorName, inputTensors, outputTensor,current_time);
         processOutputTensor(operatorName,outputTensor);
+        processParm(operatorName,outputTensor);
         updateTensorOffsets();
         current_time++;
 
@@ -72,6 +75,59 @@ void MemoryPoolImplementation()
         printTensorOffsets();
     }
 
+}
+
+void processParm(std::string operatorName,std::string outputTensor)
+{
+    
+    if(graph[operatorName].in_degree == 0)
+    {
+       return;
+    }
+    else
+    {
+        auto& CurrentOperator = *operatorMap[operatorName];
+        std::string opType = CurrentOperator.type;
+
+        if(opType == "LeakyRelu")
+        {
+            auto leakyrelu_Ptr = dynamic_cast<op::LeakyRelu*>(&CurrentOperator);
+            leakyrelu_Ptr->SetKernelPara();
+        }
+
+        else if(opType == "Tanh")
+        {
+            auto tanh_Ptr = dynamic_cast<op::Tanh*>(&CurrentOperator);
+            tanh_Ptr->SetKernelPara();
+        }
+
+        else if(opType == "Abs")
+        {
+            auto abs_Ptr = dynamic_cast<op::Abs*>(&CurrentOperator);
+            abs_Ptr->SetKernelPara();
+
+        }
+        
+        else if(opType == "Add")
+        {
+            auto add_Ptr = dynamic_cast<op::Add*>(&CurrentOperator);
+            add_Ptr->SetKernelPara();
+        }
+        
+        else if(opType == "Div")
+        {
+            auto div_Ptr = dynamic_cast<op::Div*>(&CurrentOperator);
+            div_Ptr->SetKernelPara();
+        }
+
+        else if(opType == "Conv")
+        {
+            auto conv_Ptr = dynamic_cast<op::Conv*>(&CurrentOperator);
+            conv_Ptr->SetKernelPara();
+        }
+
+        
+    }
 }
 
 std::list<MemoryBlock>::iterator findBlockByName(const std::string& name)
@@ -101,7 +157,8 @@ void processOperator(const std::string& operator_name, const std::vector<std::st
     // 图输入节点
     if(graph[operator_name].in_degree == 0)
     {
-        allocateMemory(tensor_lifetimes[outputTensor].tensor_size,outputTensor);
+        // 不需要找空闲块，在初始的时候直接分配
+        memoryPool.emplace_back(tensor_lifetimes[outputTensor].tensor_size, true, tensor_lifetimes[outputTensor].end_time, outputTensor);
         return;
     }
 

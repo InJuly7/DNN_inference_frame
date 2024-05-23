@@ -17,8 +17,11 @@ std::map<std::string, graphNode> graph;
 std::vector<std::string> topologicalOrder;
 std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 std::list<MemoryBlock> memoryPool;
+std::list<MemoryBlock> paraPool;
 std::multimap<size_t, std::string> tensorOffsets; // 使用multimap来允许相同偏移量的多个Tensor
 size_t totalMemorySize = 0;
+
+
 
 int main()
 {   
@@ -32,6 +35,11 @@ int main()
     BuildTensorLifetimes();
     MemoryPoolImplementation();
     // 构建推理引擎
+    
+
+
+
+
 
     return 0;
 }

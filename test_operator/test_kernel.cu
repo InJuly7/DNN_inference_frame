@@ -11,9 +11,6 @@ extern "C" __global__ void LeakyRelu(const float *A, const float B, float *C, in
 extern "C" __global__ void Abs(const float *A, float *C, int numElements);
 extern "C" __global__ void Div(const float *A, float div_const, float *C, int numElements);
 extern "C" __global__ void Tanh(const float *A, float *C, int numElements);
-extern "C" __global__ void Slice(const float *A, float *C, int src_block_size, int dst_block_size, 
-                                                                            int offset, int num_blocks);
-extern "C" __global__ void ConcatNCHW(const float* A, int A_C, const float* B, int B_C, float* C,int H, int W);
 
 
 int main(int argc, char* argv[])
@@ -27,7 +24,7 @@ int main(int argc, char* argv[])
     float *h_A, *h_B, *h_C;  
     float *d_A, *d_B, *d_C;  
     int numElements = 1024;  
-
+    
     size_t size = numElements * sizeof(float);
 
     h_A = (float*)malloc(size);

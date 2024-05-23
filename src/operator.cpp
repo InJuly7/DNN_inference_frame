@@ -6,9 +6,13 @@
 
 #include "operator.h"
 #include "util.h"
+#include "OpKernel.cuh" 
 
+#define PRINTKERNELPRARA 1
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
+extern std::map<std::string, graphNode> graph; 
+extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 
 // Node
 
@@ -86,6 +90,73 @@ void op::Conv::PrintAttributes()
         std::cout<<s<< " ";
     }
     std::cout<<std::endl;
+}
+
+void op::Conv::SetKernelPara()
+{
+    input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    output_shape = tensor_lifetimes[outputs[0]].tensor_shape;
+    for (const auto& pair : parameters)
+    {
+        const std::string& key = pair.first;
+        const Parameter& param = pair.second;
+
+        if (key.find("weight") != std::string::npos)
+        {
+            kshape = param.shape;
+            weight_size = param.shape[0]*param.shape[1]*param.shape[2]*param.shape[3];
+        }
+        else if (key.find("bias") != std::string::npos)
+        {
+            bias_size = param.shape[0]*param.shape[1]*param.shape[2]*param.shape[3];
+        }
+    }
+    // NCHW 
+    // input_shape 1,1,480.640      pads 1,1,1,1 up down left right
+    // pad  1,482,642
+    // edag 1,481,1,640 
+    pad[0] = input_shape[1];
+    pad[1] = input_shape[2] + pads[0] + pads[1];
+    pad[2] = input_shape[3] + pads[2] + pads[3];
+    edag[0] = pads[0];
+    edag[1] = input_shape[2] + pads[1];
+    edag[2] = pads[2];
+    edag[3] = input_shape[3] + pads[3];
+    pad_temp_size =  pad[0] * pad[1] * pad[2];
+    kernelpara_size = weight_size + pad.size() + edag.size() + output_shape.size() + 
+                                                kshape.size() + strides.size() + input_shape.size() + bias_size;
+
+    if(PRINTKERNELPRARA)
+    {
+         // 打印所有变量
+        std::cout << "input_shape: ";
+        for (const auto& dim : input_shape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "output_shape: ";
+        for (const auto& dim : output_shape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "pad: ";
+        for (const auto& dim : pad) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "edag: ";
+        for (const auto& dim : edag) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "kshape: ";
+        for (const auto& dim : kshape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "strides: ";
+        for (const auto& dim : strides) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "weight_size: " << weight_size << std::endl;
+        std::cout << "bias_size: " << bias_size << std::endl;
+        std::cout << "kernelpara_size: " << kernelpara_size << std::endl;
+    }
 }
 
 void op::Conv::SetAttributesFromFile(std::string line)
@@ -177,7 +248,8 @@ void Parameter::setValues(const std::string& line)
 
 void op::Conv::Execute()
 {
-    std::cout<<"This is a conv operator's Implementation"<<std::endl;
+    
+
 }
 
 // LeakyRelu
@@ -211,6 +283,13 @@ void op::LeakyRelu::PrintAttributes()
 {
     std::cout<<"----- "<<name<<" Attribute -----"<<std::endl;
     std::cout<<"Alpha: "<<alpha<<std::endl;
+}
+
+void op::LeakyRelu::SetKernelPara()
+{
+    kernelpara_size = 4;
+    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
 }
 
 // Constant
@@ -363,6 +442,12 @@ void op::Abs::PrintAttributes()
 
 }
 
+void op::Abs::SetKernelPara()
+{
+    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
+}
+
 // Tanh
 
 op::Tanh::Tanh(std::string Node_type, std::string Node_name)
@@ -384,6 +469,12 @@ void op::Tanh::Execute()
 void op::Tanh::PrintAttributes()
 {
 
+}
+
+void op::Tanh::SetKernelPara()
+{
+    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
 }
 
 // Div
@@ -428,6 +519,12 @@ void op::Div::PrintAttributes()
     std::cout<<"Div_constant "<<div_value<<std::endl;
 }
 
+void op::Div::SetKernelPara()
+{
+    if(div_value != 0) kernelpara_size = 4;
+    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
+}
 // Add
 
 op::Add::Add(std::string Node_type, std::string Node_name)
@@ -461,11 +558,18 @@ void op::Add::SetAttributesFromFile()
 
 void op::Add::Execute()
 {
-    std::cout<<"This is a Add operator's Implementation"<<std::endl;
+
 }
 
 void op::Add::PrintAttributes()
 {
     std::cout<<"----- "<<name<<" Attribute -----"<<std::endl;
     std::cout<<"Add_constant "<<add_value<<std::endl;
+}
+
+void op::Add::SetKernelPara()
+{
+    if(add_value != 0) kernelpara_size = 4;
+    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
 }

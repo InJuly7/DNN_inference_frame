@@ -95,7 +95,7 @@ int main()
     int strides[2] = {1, 1}; // 步长
 
     // 临时的padding后结果
-    int pad_temp_size = pads[0] * pads[1] * pads[2];
+    int pad_temp_size = pad[0] * pad[1] * pad[2];
     float *h_pad_temp = new float[pad_temp_size];
 
     // 在设备上分配
