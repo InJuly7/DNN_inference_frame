@@ -8,7 +8,7 @@
 #include "memorypool.h"
 
 #define PRINT_MEMORYPOOL 0
-#define PRINT_TENSOROFFSET 0
+#define PRINT_TENSOROFFSET 1
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
@@ -16,9 +16,8 @@ extern std::map<std::string, graphNode> graph;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern size_t totalMemorySize;
+extern size_t totalParaSize;
 extern std::multimap<size_t, std::string> tensorOffsets;
-
-
 
 extern std::string getNodeName(const std::string& outputName);
 
@@ -73,6 +72,11 @@ void MemoryPoolImplementation()
     if(PRINT_TENSOROFFSET)
     {
         printTensorOffsets();
+        calculateTotalMemorySize();
+        std::cout << "TotalMemory: ";
+        std::cout<<totalMemorySize<<std::endl;
+        std::cout << "TotalPara: ";
+        std::cout <<totalParaSize<<std::endl;
     }
 
 }
@@ -88,44 +92,44 @@ void processParm(std::string operatorName,std::string outputTensor)
     {
         auto& CurrentOperator = *operatorMap[operatorName];
         std::string opType = CurrentOperator.type;
+        int current_kernelsize = 0;
 
         if(opType == "LeakyRelu")
         {
             auto leakyrelu_Ptr = dynamic_cast<op::LeakyRelu*>(&CurrentOperator);
-            leakyrelu_Ptr->SetKernelPara();
+            current_kernelsize = leakyrelu_Ptr->SetKernelPara();
         }
-
+        
         else if(opType == "Tanh")
         {
             auto tanh_Ptr = dynamic_cast<op::Tanh*>(&CurrentOperator);
-            tanh_Ptr->SetKernelPara();
+            current_kernelsize = tanh_Ptr->SetKernelPara();
         }
 
         else if(opType == "Abs")
         {
             auto abs_Ptr = dynamic_cast<op::Abs*>(&CurrentOperator);
-            abs_Ptr->SetKernelPara();
-
+            current_kernelsize = abs_Ptr->SetKernelPara();
         }
         
         else if(opType == "Add")
         {
             auto add_Ptr = dynamic_cast<op::Add*>(&CurrentOperator);
-            add_Ptr->SetKernelPara();
+            current_kernelsize = add_Ptr->SetKernelPara();
         }
         
         else if(opType == "Div")
         {
             auto div_Ptr = dynamic_cast<op::Div*>(&CurrentOperator);
-            div_Ptr->SetKernelPara();
+            current_kernelsize = div_Ptr->SetKernelPara();
         }
 
         else if(opType == "Conv")
         {
             auto conv_Ptr = dynamic_cast<op::Conv*>(&CurrentOperator);
-            conv_Ptr->SetKernelPara();
+            current_kernelsize = conv_Ptr->SetKernelPara();
         }
-
+        totalParaSize += current_kernelsize;
         
     }
 }
@@ -697,4 +701,12 @@ void printTensorOffsets()
         std::cout << "Tensor: " << pair.second << ", Offset: " << pair.first/307200 << '\n';
     }
     std::cout << "---------------------\n";
+}
+
+void calculateTotalMemorySize()
+{
+    for (const auto& block : memoryPool)
+    {
+        totalMemorySize += block.size;
+    }
 }

@@ -9,7 +9,6 @@ struct Parameter
 {
     std::string name;
     std::vector<int> shape; 
-    // 展平数值
     std::vector<float> values;
     void setValues(const std::string& line);
 };
@@ -49,6 +48,7 @@ namespace op
             void SetAttributesFromFile(std::string line) override;
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
 
         private:
             std::vector<int> input_shape;
@@ -59,8 +59,8 @@ namespace op
             int weight_size = 0;
             int bias_size = 0;
             int pad_temp_size = 0;
-
-            void SetKernelPara();
+            int kernelpara_size = 0;
+            
 
 
 
@@ -74,12 +74,12 @@ namespace op
             void SetAttributesFromFile(std::string line) override;
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
         
         private:
-            int kernelpara_size = 0;
+            int kernelpara_size = 8;
             int numElements = 0;
-
-            void SetKernelPara();
+            
     };
     class Constant : public Node
     {
@@ -121,10 +121,12 @@ namespace op
             void SetAttributesFromFile(std::string line) override;
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
 
         private:
             int numElements = 0;
-            void SetKernelPara();
+            int kernelpara_size = 4;
+            
     };
     class Tanh : public Node
     {
@@ -133,39 +135,42 @@ namespace op
             void SetAttributesFromFile(std::string line) override;
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
         
         private:
             int numElements = 0;
-            void SetKernelPara();
+            int kernelpara_size = 4;
+            
     };
     class Add : public Node
     {
         public:
-            float add_value;
-            int kernelpara_size = 0;
+            float add_value = 0;
             Add(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile();
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
         
         private:
-            int kernelpara_size = 0;
+            int kernelpara_size = 4;
             int numElements = 0;
-            void SetKernelPara();
+            
     };
     class Div : public Node
     {
         public:
-            float div_value;
+            float div_value = 1;
             Div(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile();
             void Execute() override;
             void PrintAttributes() override;
+            int SetKernelPara();
 
         private:
-            int kernelpara_size = 0;
+            int kernelpara_size = 4;
             int numElements = 0;
-            void SetKernelPara();
+            
     };
 };
 

@@ -20,6 +20,7 @@ std::list<MemoryBlock> memoryPool;
 std::list<MemoryBlock> paraPool;
 std::multimap<size_t, std::string> tensorOffsets; // 使用multimap来允许相同偏移量的多个Tensor
 size_t totalMemorySize = 0;
+size_t totalParaSize = 0;
 
 
 
@@ -36,7 +37,7 @@ int main()
     MemoryPoolImplementation();
     // 构建推理引擎
     
-
+    
 
 
 
