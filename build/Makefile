@@ -169,6 +169,60 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/main.cpp.s
 .PHONY : main.cpp.s
 
+src/cudaop.o: src/cudaop.cpp.o
+
+.PHONY : src/cudaop.o
+
+# target to build an object file
+src/cudaop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cudaop.cpp.o
+.PHONY : src/cudaop.cpp.o
+
+src/cudaop.i: src/cudaop.cpp.i
+
+.PHONY : src/cudaop.i
+
+# target to preprocess a source file
+src/cudaop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cudaop.cpp.i
+.PHONY : src/cudaop.cpp.i
+
+src/cudaop.s: src/cudaop.cpp.s
+
+.PHONY : src/cudaop.s
+
+# target to generate assembly for a file
+src/cudaop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/cudaop.cpp.s
+.PHONY : src/cudaop.cpp.s
+
+src/engine.o: src/engine.cpp.o
+
+.PHONY : src/engine.o
+
+# target to build an object file
+src/engine.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/engine.cpp.o
+.PHONY : src/engine.cpp.o
+
+src/engine.i: src/engine.cpp.i
+
+.PHONY : src/engine.i
+
+# target to preprocess a source file
+src/engine.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/engine.cpp.i
+.PHONY : src/engine.cpp.i
+
+src/engine.s: src/engine.cpp.s
+
+.PHONY : src/engine.s
+
+# target to generate assembly for a file
+src/engine.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/engine.cpp.s
+.PHONY : src/engine.cpp.s
+
 src/memorypool.o: src/memorypool.cpp.o
 
 .PHONY : src/memorypool.o
@@ -262,6 +316,12 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... src/cudaop.o"
+	@echo "... src/cudaop.i"
+	@echo "... src/cudaop.s"
+	@echo "... src/engine.o"
+	@echo "... src/engine.i"
+	@echo "... src/engine.s"
 	@echo "... src/memorypool.o"
 	@echo "... src/memorypool.i"
 	@echo "... src/memorypool.s"

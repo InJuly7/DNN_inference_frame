@@ -6,7 +6,15 @@
 
 #IncludeRegexTransform: 
 
-../include/memorypool.h
+../include/cudaop.h
+string
+-
+vector
+-
+map
+-
+memory
+-
 
 ../include/operator.h
 string
@@ -36,33 +44,13 @@ cmath
 operator.h
 ../include/operator.h
 
-/home/firefly/Tingshuo/op_test/src/memorypool.cpp
+/home/firefly/Tingshuo/op_test/src/cudaop.cpp
 iostream
 -
-list
--
-vector
--
-string
--
-algorithm
+map
 -
 util.h
 /home/firefly/Tingshuo/op_test/src/util.h
-memorypool.h
-/home/firefly/Tingshuo/op_test/src/memorypool.h
-
-/home/firefly/Tingshuo/op_test/src/util.cpp
-iostream
--
-fstream
--
-sstream
--
-algorithm
--
-util.h
-/home/firefly/Tingshuo/op_test/src/util.h
-algorithm
--
+cudaop.h
+/home/firefly/Tingshuo/op_test/src/cudaop.h
 

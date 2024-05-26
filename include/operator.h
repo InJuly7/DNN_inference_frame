@@ -26,7 +26,6 @@ namespace op
             void PrintInfo();
             virtual void PrintPara();
             virtual void StoreParameter(const std::string& line);
-            virtual void Execute() = 0;
             virtual void PrintAttributes() = 0;
             virtual void SetAttributesFromFile(std::string line);
     };
@@ -41,30 +40,13 @@ namespace op
             std::vector<int> strides;
             std::map<std::string, Parameter> parameters;
 
-
             Conv(std::string Node_type,std::string Node_name);
             void StoreParameter(const std::string& line) override;
             void PrintPara();
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
-            int SetKernelPara();
-
-        private:
-            std::vector<int> input_shape;
-            std::vector<int> output_shape;
-            std::vector<int> pad;
-            std::vector<int> edag;
-            std::vector<int> kshape;
-            int weight_size = 0;
-            int bias_size = 0;
-            int pad_temp_size = 0;
-            int kernelpara_size = 0;
-            
-
-
-
     };
+
     class LeakyRelu : public Node
     {
         public:
@@ -72,15 +54,9 @@ namespace op
 
             LeakyRelu(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
-            int SetKernelPara();
-        
-        private:
-            int kernelpara_size = 8;
-            int numElements = 0;
-            
     };
+
     class Constant : public Node
     {
         public:
@@ -88,9 +64,9 @@ namespace op
             
             Constant(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
     };
+
     class Slice : public Node
     {
         public:
@@ -101,9 +77,9 @@ namespace op
 
             Slice(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile();
-            void Execute() override;
             void PrintAttributes() override;
     };
+
     class Concat : public Node
     {
         public:
@@ -111,67 +87,47 @@ namespace op
 
             Concat(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
     };
+
     class Abs : public Node
     {
         public:
+
             Abs(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
-            int SetKernelPara();
-
-        private:
-            int numElements = 0;
-            int kernelpara_size = 4;
-            
     };
+
     class Tanh : public Node
     {
         public:
+
             Tanh(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile(std::string line) override;
-            void Execute() override;
             void PrintAttributes() override;
-            int SetKernelPara();
-        
-        private:
-            int numElements = 0;
-            int kernelpara_size = 4;
-            
     };
+
     class Add : public Node
     {
         public:
             float add_value = 0;
+            
             Add(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile();
-            void Execute() override;
-            void PrintAttributes() override;
-            int SetKernelPara();
-        
-        private:
-            int kernelpara_size = 4;
-            int numElements = 0;
-            
+            void PrintAttributes() override;           
     };
+
     class Div : public Node
     {
         public:
             float div_value = 1;
+            
             Div(std::string Node_type,std::string Node_name);
             void SetAttributesFromFile();
-            void Execute() override;
             void PrintAttributes() override;
-            int SetKernelPara();
-
-        private:
-            int kernelpara_size = 4;
-            int numElements = 0;
-            
     };
+
 };
 
 #endif // OPERATORS_H

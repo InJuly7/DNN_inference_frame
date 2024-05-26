@@ -84,6 +84,24 @@ std::string getNodeName(const std::string& outputName)
     return outputName;  
 }
 
+std::string getOutputTensor(const std::string& NodeName)
+{
+    std::string  suffix = "_output_";
+    if(graph[NodeName].in_degree == 0)
+    {
+        return NodeName;
+    }
+    else if(graph[NodeName].dependents.empty())
+    {
+        return "output_1";
+    }
+    else
+    {
+        return NodeName+suffix;
+    }
+
+}
+
 void ConstInput(op::Node& operatorNode)
 {
     if (operatorNode.type == "Slice")

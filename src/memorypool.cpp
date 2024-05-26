@@ -8,7 +8,7 @@
 #include "memorypool.h"
 
 #define PRINT_MEMORYPOOL 0
-#define PRINT_TENSOROFFSET 1
+#define PRINT_TENSOROFFSET 0
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
@@ -18,9 +18,7 @@ extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern size_t totalMemorySize;
 extern size_t totalParaSize;
 extern std::multimap<size_t, std::string> tensorOffsets;
-
-extern std::string getNodeName(const std::string& outputName);
-
+extern std::map<std::string, size_t> paraOffsets;
 
 void MemoryPoolImplementation()
 {
@@ -57,7 +55,6 @@ void MemoryPoolImplementation()
         }
         processOperator(operatorName, inputTensors, outputTensor,current_time);
         processOutputTensor(operatorName,outputTensor);
-        processParm(operatorName,outputTensor);
         updateTensorOffsets();
         current_time++;
 
@@ -75,63 +72,8 @@ void MemoryPoolImplementation()
         calculateTotalMemorySize();
         std::cout << "TotalMemory: ";
         std::cout<<totalMemorySize<<std::endl;
-        std::cout << "TotalPara: ";
-        std::cout <<totalParaSize<<std::endl;
     }
 
-}
-
-void processParm(std::string operatorName,std::string outputTensor)
-{
-    
-    if(graph[operatorName].in_degree == 0)
-    {
-       return;
-    }
-    else
-    {
-        auto& CurrentOperator = *operatorMap[operatorName];
-        std::string opType = CurrentOperator.type;
-        int current_kernelsize = 0;
-
-        if(opType == "LeakyRelu")
-        {
-            auto leakyrelu_Ptr = dynamic_cast<op::LeakyRelu*>(&CurrentOperator);
-            current_kernelsize = leakyrelu_Ptr->SetKernelPara();
-        }
-        
-        else if(opType == "Tanh")
-        {
-            auto tanh_Ptr = dynamic_cast<op::Tanh*>(&CurrentOperator);
-            current_kernelsize = tanh_Ptr->SetKernelPara();
-        }
-
-        else if(opType == "Abs")
-        {
-            auto abs_Ptr = dynamic_cast<op::Abs*>(&CurrentOperator);
-            current_kernelsize = abs_Ptr->SetKernelPara();
-        }
-        
-        else if(opType == "Add")
-        {
-            auto add_Ptr = dynamic_cast<op::Add*>(&CurrentOperator);
-            current_kernelsize = add_Ptr->SetKernelPara();
-        }
-        
-        else if(opType == "Div")
-        {
-            auto div_Ptr = dynamic_cast<op::Div*>(&CurrentOperator);
-            current_kernelsize = div_Ptr->SetKernelPara();
-        }
-
-        else if(opType == "Conv")
-        {
-            auto conv_Ptr = dynamic_cast<op::Conv*>(&CurrentOperator);
-            current_kernelsize = conv_Ptr->SetKernelPara();
-        }
-        totalParaSize += current_kernelsize;
-        
-    }
 }
 
 std::list<MemoryBlock>::iterator findBlockByName(const std::string& name)

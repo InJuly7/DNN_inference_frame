@@ -34,7 +34,8 @@ std::vector<int> parseNumbers(const std::string& line);
 std::string parseString(std::string src_sub);
 std::vector<float> parseFloats(const std::string &line);
 std::string getNodeName(const std::string &outputName);
-void ConstInput(op::Node& operatorNode);
+std::string getOutputTensor(const std::string &NodeName);
+void ConstInput(op::Node &operatorNode);
 std::unique_ptr<op::Node> CreateOperator(const std::string &operatorName, const std::string &operatorType);
 void Read_Model(std::string model_txt);
 

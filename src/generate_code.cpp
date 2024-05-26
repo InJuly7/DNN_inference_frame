@@ -8,7 +8,7 @@
 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
-extern "C" __global__ void AddKernel_2(const float *A, const float *B, float *C, int numElements);
+
 
 
 
@@ -107,4 +107,9 @@ void generateAllKernels()
     {
         launchKernel(opName);
     }
+}
+
+void BuildCudaIndex()
+{
+
 }
