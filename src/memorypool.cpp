@@ -16,9 +16,7 @@ extern std::map<std::string, graphNode> graph;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern size_t totalMemorySize;
-extern size_t totalParaSize;
 extern std::multimap<size_t, std::string> tensorOffsets;
-extern std::map<std::string, size_t> paraOffsets;
 
 void MemoryPoolImplementation()
 {

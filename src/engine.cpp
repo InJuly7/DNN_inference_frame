@@ -5,12 +5,15 @@
 #include "cudaop.h"
 #include "engine.h"
 
-#define PRINTCUDAOP 1
+
 
 extern std::vector<std::string> topologicalOrder;
 extern std::map<std::string, graphNode> graph; 
 extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, std::unique_ptr<cuda::Node>> cudaMap;
+extern std::map<std::string, size_t> paraOffsets;
+extern size_t totalParaSize;
+
 
 void BuildCudaOperator()
 {
@@ -25,11 +28,15 @@ void BuildCudaOperator()
         {
             const auto& CurrentOperator = operatorMap[operatorName];
             std::string opType = CurrentOperator->type;
+            if(opType == "Concat" || opType == "Slice") continue;
             CreateCudaOperator(opType,operatorName);
             auto& CudaOperator = cudaMap[operatorName];
+            
             if(PRINTCUDAOP)
             {
                 CudaOperator->PrintCudaNode();
+                CudaOperator->printArgInfo();
+                std::cout<<std::endl;
             }
         }
     }
@@ -37,35 +44,56 @@ void BuildCudaOperator()
 
 void CreateCudaOperator(const std::string& opType, const std::string& operatorName)
 {
-    if(opType == "Concat" || opType == "Slice") return;
+    int flag = 1;
+    if(opType == "LeakyRelu")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::LeakyRelu>(opType,operatorName);
+    }
+    else if(opType == "Add")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::Add>(opType,operatorName);
 
-        else if(opType == "LeakyRelu")
-        {
-            cudaMap[operatorName] = std::make_unique<cuda::LeakyRelu>(opType,operatorName);
-            // auto& cudaOperator = cudaMap[operatorName];
-            // cudaOperator
-            // cudaOperator->SetKernelPara()
-        }
-        else if(opType == "Add")
-        {
-            cudaMap[operatorName] = std::make_unique<cuda::Add>(opType,operatorName);
-        }
-        else if(opType == "Abs")
-        {
-            cudaMap[operatorName] = std::make_unique<cuda::Abs>(opType,operatorName);
-        }
-        else if(opType == "Tanh")
-        {
-           cudaMap[operatorName] = std::make_unique<cuda::Tanh>(opType,operatorName);
+    }
+    else if(opType == "Abs")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::Abs>(opType,operatorName);
+    }
+    else if(opType == "Tanh")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::Tanh>(opType,operatorName);
 
-        }
-        else if(opType == "Div")
-        {
-            cudaMap[operatorName] = std::make_unique<cuda::Div>(opType,operatorName);
-        }
+    }
+    else if(opType == "Div")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::Div>(opType,operatorName);
+    }
+    else if(opType == "Conv")
+    {
+        cudaMap[operatorName] = std::make_unique<cuda::Conv>(opType,operatorName);
+    }
+    else
+    {
+        std::cout<<"CUDA算子库里没有该算子"<<std::endl;
+        flag = 0;
+    }
+    if(flag)
+    {
+        auto& cudaOperator = cudaMap[operatorName];
+        cudaOperator->para_index = totalParaSize;
+        int  kernelpara_size = cudaOperator->SetKernelPara(); 
+        paraOffsets[operatorName] = totalParaSize;
+        totalParaSize += kernelpara_size;
+        return ;
+    }
+    
+}
 
-        else
-        {
-            std::cout<<"CUDA算子库里没有该算子"<<std::endl;
-        }
+void PrintParaOffsets()
+{
+    std::cout << "Parameter Offsets:" << std::endl;
+    for (const auto& pair : paraOffsets)
+    {
+        std::cout << "Key: " << pair.first << ", Offset: " << pair.second << std::endl;
+    }
+    std::cout << "Total Parameter Size: " << totalParaSize << std::endl;
 }

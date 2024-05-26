@@ -7,12 +7,13 @@
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
 extern std::map<std::string, graphNode> graph; 
 extern std::multimap<size_t, std::string> tensorOffsets;
-
+extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
+extern size_t totalParaSize;
 
 cuda::Node::Node(const std::string &Node_type, const std::string &Node_name)
 {
     type = Node_type;
-    name = Node_type;
+    name = Node_name;
     std::string output_tensor = getOutputTensor(Node_name);
     int input_size = graph[Node_name].inputs.size();
     for (const auto& pair : tensorOffsets)
@@ -50,6 +51,7 @@ void cuda::Node::PrintCudaNode()
     {
         std::cout << idx << " ";
     }
+    std::cout<< "Para Index "<<para_index<<"\n";
     std::cout << "\n";
 }
 
@@ -72,78 +74,88 @@ void cuda::Conv::Execute()
 
 int cuda::Conv::SetKernelPara()
 {
-    // /*
-    //     内存布局
-    // */
-    // input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
-    // output_shape = tensor_lifetimes[getOutputTensor(name)].tensor_shape;
+    /*
+        内存布局
+    */
+    auto& node = *operatorMap[name];
+    auto conv_ptr = dynamic_cast<op::Conv*>(&node);
 
-    // for (const auto& pair : parameters)
-    // {
-    //     const std::string& key = pair.first;
-    //     const Parameter& param = pair.second;
+    input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
+    output_shape = tensor_lifetimes[getOutputTensor(name)].tensor_shape;
 
-    //     if (key.find("weight") != std::string::npos)
-    //     {
-    //         kshape = param.shape;
-    //         weight_size = param.shape[0]*param.shape[1]*param.shape[2]*param.shape[3];
-    //     }
-    //     else if (key.find("bias") != std::string::npos)
-    //     {
-    //         bias_size = param.shape[0];
-    //     }
-    // }
+    for (const auto& pair : conv_ptr->parameters)
+    {
+        const std::string& key = pair.first;
+        const Parameter& param = pair.second;
+        if (key.find("weight") != std::string::npos)
+        {
+            kshape = param.shape;
+            weight = param.values;
+            weight_size = param.shape[0]*param.shape[1]*param.shape[2]*param.shape[3];
+        }
+        else if (key.find("bias") != std::string::npos)
+        {
+            bias = param.values;
+            bias_size = param.shape[0];
+        }
+    }
     
-    // // NCHW 
-    // // input_shape 1,1,480.640      pads 1,1,1,1 up down left right
-    // // pad  1,482,642
-    // // edag 1,481,1,640 
+    // NCHW 
+    // input_shape 1,1,480.640      op_pads 1,1,1,1 up down left right
+    // pad  1,482,642
+    // edag 1,481,1,640 
+    std::vector<int> op_pads = conv_ptr->pads;
+    pads.push_back(input_shape[1]);
+    pads.push_back(input_shape[2] + op_pads[0] + op_pads[1]);
+    pads.push_back(input_shape[3] + op_pads[2] + op_pads[3]);
+
+    edag.push_back(op_pads[0]);
+    edag.push_back(input_shape[2] + op_pads[1]);
+    edag.push_back(op_pads[2]);
+    edag.push_back(input_shape[3] + op_pads[3]);
+
+    pads_temp_size =  pads[0] * pads[1] * pads[2];
+    strides = conv_ptr->strides;
+    kernelpara_size = weight_size + pads.size() + edag.size() + output_shape.size() + 
+                                                kshape.size() + strides.size() + input_shape.size() + bias_size;
     
-    // pad.push_back(input_shape[1]);
-    // pad.push_back(input_shape[2] + pads[0] + pads[1]);
-    // pad.push_back(input_shape[3] + pads[2] + pads[3]);
-
-    // edag.push_back(pads[0]);
-    // edag.push_back(input_shape[2] + pads[1]);
-    // edag.push_back(pads[2]);
-    // edag.push_back(input_shape[3] + pads[3]);
-
-    // pad_temp_size =  pad[0] * pad[1] * pad[2];
-    // kernelpara_size = weight_size + pad.size() + edag.size() + output_shape.size() + 
-    //                                             kshape.size() + strides.size() + input_shape.size() + bias_size;
-
-    // if(PRINTKERNELPRARA)
-    // {
-    //     // 打印所有变量
-    //     std::cout << "input_shape: ";
-    //     for (const auto& dim : input_shape) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "output_shape: ";
-    //     for (const auto& dim : output_shape) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "pad: ";
-    //     for (const auto& dim : pad) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "edag: ";
-    //     for (const auto& dim : edag) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "kshape: ";
-    //     for (const auto& dim : kshape) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "strides: ";
-    //     for (const auto& dim : strides) std::cout << dim << " ";
-    //     std::cout << std::endl;
-
-    //     std::cout << "weight_size: " << weight_size << std::endl;
-    //     std::cout << "bias_size: " << bias_size << std::endl;
-    //     std::cout << "kernelpara_size: " << kernelpara_size << std::endl;
-    // }
     return kernelpara_size;
+
+}
+
+void cuda::Conv::printArgInfo()
+{
+    if(PRINTKERNELPRARA)
+    {
+        // 打印所有变量
+        std::cout << "input_shape: ";
+        for (const auto& dim : input_shape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "output_shape: ";
+        for (const auto& dim : output_shape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "pads: ";
+        for (const auto& dim : pads) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "edag: ";
+        for (const auto& dim : edag) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "kshape: ";
+        for (const auto& dim : kshape) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "strides: ";
+        for (const auto& dim : strides) std::cout << dim << " ";
+        std::cout << std::endl;
+
+        std::cout << "weight_size: " << weight_size << std::endl;
+        std::cout << "bias_size: " << bias_size << std::endl;
+        std::cout << "kernelpara_size: " << kernelpara_size << std::endl;
+    }
 
 }
 
@@ -160,15 +172,16 @@ int cuda::Abs::SetKernelPara()
         内存布局
     */
     kernelpara_size = 4;
-    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
-    if(PRINTKERNELPRARA)
-    {
-        std::cout <<"numElements: "<<numElements<<std::endl;
-        std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
-    }
     return kernelpara_size;
 
+}
+
+void cuda::Abs::printArgInfo()
+{
+    std::cout <<"numElements: "<<numElements<<std::endl;
+    std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
 }
 
 // LeakyRelu
@@ -180,22 +193,24 @@ void cuda::LeakyRelu::Execute()
 
 int cuda::LeakyRelu::SetKernelPara()
 {
-     /*
+    /*
         内存布局
     */
 
     kernelpara_size = 8;
-    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
-    
-    if(PRINTKERNELPRARA)
-    {
-        // 打印所有变量
-        std::cout <<"alpha: "<<alpha<<std::endl;
-        std::cout <<"numElements: "<<numElements<<std::endl;
-        std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
-    }
+    auto& node = *operatorMap[name];
+    auto leaky_ptr = dynamic_cast<op::LeakyRelu*>(&node);
+    alpha = leaky_ptr->alpha;
     return kernelpara_size;
+}
+
+void cuda::LeakyRelu::printArgInfo()
+{
+    std::cout <<"alpha: "<<alpha<<std::endl;
+    std::cout <<"numElements: "<<numElements<<std::endl;
+    std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
 }
 
 // Tanh
@@ -208,14 +223,15 @@ void cuda::Tanh::Execute()
 int cuda::Tanh::SetKernelPara()
 {
     kernelpara_size = 4;
-    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
-    if(PRINTKERNELPRARA)
-    {
-        std::cout <<"numElements: "<<numElements<<std::endl;
-        std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
-    }
     return kernelpara_size;
+}
+
+void cuda::Tanh::printArgInfo()
+{
+    std::cout <<"numElements: "<<numElements<<std::endl;
+    std::cout <<"kernelpara_size: "<< kernelpara_size << std::endl;
 }
 
 // Add
@@ -227,19 +243,22 @@ void cuda::Add::Execute()
 
 int cuda::Add::SetKernelPara()
 {
+    auto& node = *operatorMap[name];
+    auto add_ptr = dynamic_cast<op::Add*>(&node);
+    add_value = add_ptr->add_value;
+
     if(add_value != 0) kernelpara_size = 8;
     else kernelpara_size = 4;
-    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
-
-    if(PRINTKERNELPRARA)
-    {
-        
-        std::cout <<"numElements: "<<numElements<<std::endl;
-        std::cout <<"add_value: "<<add_value<<std::endl;
-        std::cout <<"kernelpara_size: "<<kernelpara_size<<std::endl;
-    }
     return kernelpara_size;
+}
+
+void cuda::Add::printArgInfo()
+{
+    std::cout <<"numElements: "<<numElements<<std::endl;
+    std::cout <<"add_value: "<<add_value<<std::endl;
+    std::cout <<"kernelpara_size: "<<kernelpara_size<<std::endl;
 }
 
 // Div
@@ -251,19 +270,21 @@ void cuda::Div::Execute()
 
 int cuda::Div::SetKernelPara()
 {
+    auto& node = *operatorMap[name];
+    auto div_ptr = dynamic_cast<op::Div*>(&node);
+    div_value = div_ptr->div_value;
+
     if(div_value != 1) kernelpara_size = 8;
     else kernelpara_size = 4;
-    std::vector<int> input_shape = tensor_lifetimes[graph[name].inputs[0]].tensor_shape;
+    std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
-
-    if(PRINTKERNELPRARA)
-    {
-        std::cout <<"numElements: "<<numElements<<std::endl;
-        std::cout <<"div_value: "<<div_value<<std::endl; 
-        std::cout <<"kernelpara_size: "<<kernelpara_size<<std::endl;
-    }
     return kernelpara_size;
     
 }
 
-
+void cuda::Div::printArgInfo()
+{
+    std::cout <<"numElements: "<<numElements<<std::endl;
+    std::cout <<"div_value: "<<div_value<<std::endl; 
+    std::cout <<"kernelpara_size: "<<kernelpara_size<<std::endl;
+}

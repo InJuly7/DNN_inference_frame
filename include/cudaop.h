@@ -7,6 +7,8 @@
 #include <memory>
 
 
+#define PRINTKERNELPRARA 1
+#define PRINTCUDAOP 1
 
 namespace cuda
 {
@@ -17,11 +19,13 @@ namespace cuda
             std::string name;
             std::vector<int> inputs_idx;
             std::vector<int> outputs_idx;
-
+            int para_index = -1;
+            
             Node(const std::string& Node_type, const std::string& Node_name);
             void PrintCudaNode();
             virtual void Execute() = 0;
             virtual int SetKernelPara() = 0;
+            virtual void printArgInfo() = 0;
     };
 
     class Conv : public Node
@@ -30,7 +34,8 @@ namespace cuda
             // cuda para
             std::vector<int> input_shape;
             std::vector<int> output_shape;
-            std::vector<int> pad;
+            std::vector<int> strides;
+            std::vector<int> pads;
             std::vector<int> edag;
             std::vector<int> kshape;
             std::vector<float> weight;
@@ -38,13 +43,14 @@ namespace cuda
             
             int weight_size = 0;
             int bias_size = 0;
-            int pad_temp_size = 0;
+            int pads_temp_size = 0;
             int kernelpara_size = 0;
-            int para_index;
+            
 
             Conv(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
+            void printArgInfo();
     };
     
     class LeakyRelu : public Node
@@ -59,6 +65,7 @@ namespace cuda
             LeakyRelu(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};;
             void Execute() override;
             int SetKernelPara();
+            void printArgInfo();
     };
 
     class Abs : public Node
@@ -72,6 +79,7 @@ namespace cuda
             Abs(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
+            void printArgInfo();
     };
     
     class Tanh : public Node
@@ -85,6 +93,7 @@ namespace cuda
             Tanh(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
+            void printArgInfo();
     };
 
     class Add : public Node
@@ -98,7 +107,8 @@ namespace cuda
 
             Add(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
-            int SetKernelPara();            
+            int SetKernelPara();
+            void printArgInfo();        
     };
 
     class Div : public Node
@@ -113,6 +123,7 @@ namespace cuda
             Div(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
+            void printArgInfo();
     };
 };
 

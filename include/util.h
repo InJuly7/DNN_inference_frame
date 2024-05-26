@@ -12,7 +12,7 @@
 
 #include "operator.h"
 
-#define PRINTKERNELPRARA 0
+
 
 
 struct graphNode

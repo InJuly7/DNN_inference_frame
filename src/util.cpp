@@ -86,14 +86,18 @@ std::string getNodeName(const std::string& outputName)
 
 std::string getOutputTensor(const std::string& NodeName)
 {
-    std::string  suffix = "_output_";
+    std::string  suffix = "_output_0";
     if(graph[NodeName].in_degree == 0)
     {
         return NodeName;
     }
-    else if(graph[NodeName].dependents.empty())
+    else if(graph[NodeName].dependents[0] == "output_1")
     {
         return "output_1";
+    }
+    else if(graph[NodeName].dependents.empty())
+    {
+        return nullptr;
     }
     else
     {
