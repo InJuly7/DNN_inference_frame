@@ -7,8 +7,9 @@
 #include <memory>
 
 
-#define PRINTKERNELPRARA 1
+#define PRINTKERNELPRARA 0
 #define PRINTCUDAOP 1
+#define PRINTPARAOFFSET 0
 
 namespace cuda
 {
@@ -19,7 +20,7 @@ namespace cuda
             std::string name;
             std::vector<int> inputs_idx;
             std::vector<int> outputs_idx;
-            int para_index = -1;
+            int para_index;
             
             Node(const std::string& Node_type, const std::string& Node_name);
             void PrintCudaNode();
@@ -41,6 +42,7 @@ namespace cuda
             std::vector<float> weight;
             std::vector<float> bias;
             
+            int group;
             int weight_size = 0;
             int bias_size = 0;
             int pads_temp_size = 0;

@@ -69,13 +69,27 @@ int cuda::Node::SetKernelPara()
 
 void cuda::Conv::Execute()
 {
-
+    /*
+        调用接口:
+        Conv2dg(const float *A, float *C, float *weight, int *pads, int *edag, 
+                int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape, const float *bias)
+        Conv2db(const float *A, float *C, const float *weight, int *pads, int *edag,
+                int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape, const float *bias)
+    */
 }
 
 int cuda::Conv::SetKernelPara()
 {
     /*
         内存布局
+        0                               --> weights
+        ... + weight_size               --> bias
+        ... + bias_size                 --> pads
+        ... + pads.size()               --> edag
+        ... + edag.size()               --> output_shape
+        ... + output_shape.size()       --> kshape
+        ... + kshape.size()             --> strides
+        ... + strides.size()            --> input_shape
     */
     auto& node = *operatorMap[name];
     auto conv_ptr = dynamic_cast<op::Conv*>(&node);
@@ -114,6 +128,7 @@ int cuda::Conv::SetKernelPara()
     edag.push_back(op_pads[2]);
     edag.push_back(input_shape[3] + op_pads[3]);
 
+    group = conv_ptr->group;
     pads_temp_size =  pads[0] * pads[1] * pads[2];
     strides = conv_ptr->strides;
     kernelpara_size = weight_size + pads.size() + edag.size() + output_shape.size() + 
@@ -163,13 +178,17 @@ void cuda::Conv::printArgInfo()
 
 void cuda::Abs::Execute()
 {
-
+    /*
+        调用接口:
+        Abs(const float *A, float *C, int numElements)
+    */
 }
 
 int cuda::Abs::SetKernelPara()
 {
     /*
         内存布局
+        0   --> numElements
     */
     kernelpara_size = 4;
     std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
@@ -188,13 +207,18 @@ void cuda::Abs::printArgInfo()
 
 void cuda::LeakyRelu::Execute()
 {
-
+    /*
+        调用接口:
+        LeakyRelu(const float *A, const float alpha, float *C, int numElements)
+    */
 }
 
 int cuda::LeakyRelu::SetKernelPara()
 {
     /*
         内存布局
+        0   --> alpha
+        4   --> numElements
     */
 
     kernelpara_size = 8;
@@ -217,11 +241,18 @@ void cuda::LeakyRelu::printArgInfo()
 
 void cuda::Tanh::Execute()
 {
-
+    /*
+        调用接口:
+        Tanh(const float *A, float *C, int numElements)
+    */
 }
 
 int cuda::Tanh::SetKernelPara()
 {
+    /*
+        内存布局
+        0   --> numElements
+    */
     kernelpara_size = 4;
     std::vector<int> input_shape = tensor_lifetimes[getOutputTensor(graph[name].inputs[0])].tensor_shape;
     numElements = input_shape[0]*input_shape[1]*input_shape[2]*input_shape[3];
@@ -238,11 +269,20 @@ void cuda::Tanh::printArgInfo()
 
 void cuda::Add::Execute()
 {
-
+    /*
+        调用接口:
+        AddKernel_1(const float *A, const float add_const, float *C, int numElements)
+        AddKernel_2(const float *A, const float *B, float *C, int numElements)
+    */
 }
 
 int cuda::Add::SetKernelPara()
 {
+    /*
+        内存布局
+        0   --> add_const
+        4   --> numElements
+    */
     auto& node = *operatorMap[name];
     auto add_ptr = dynamic_cast<op::Add*>(&node);
     add_value = add_ptr->add_value;
@@ -265,11 +305,19 @@ void cuda::Add::printArgInfo()
 
 void cuda::Div::Execute()
 {
-
+    /*
+        调用接口:
+        Div(const float *A, float div_const, float *C, int numElements)
+    */
 }
 
 int cuda::Div::SetKernelPara()
 {
+    /*
+        内存布局
+        0   --> div_const
+        4   --> numElements
+    */
     auto& node = *operatorMap[name];
     auto div_ptr = dynamic_cast<op::Div*>(&node);
     div_value = div_ptr->div_value;
