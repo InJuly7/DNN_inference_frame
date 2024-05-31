@@ -20,9 +20,5 @@ add_executable(main
     ../src/operator.cpp
     ../src/util.cpp
     ../src/memorypool.cpp
-    ../src/engine.cpp
-    ../src/cudaop.cpp
     main.cpp)
-
-link_directories(${SDK_DIR}/lib ${CMAKE_BINARY_DIR})
 

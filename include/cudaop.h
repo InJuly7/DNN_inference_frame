@@ -6,10 +6,9 @@
 #include <map>
 #include <memory>
 
-
-#define PRINTKERNELPRARA 0
+#define PRINTKERNELPRARA 1
 #define PRINTCUDAOP 1
-#define PRINTPARAOFFSET 0
+#define PRINTPARAOFFSET 1
 
 namespace cuda
 {
@@ -48,7 +47,19 @@ namespace cuda
             int pads_temp_size = 0;
             int kernelpara_size = 0;
             
-
+            float* d_A;
+            float* d_C;
+            float* d_weight;
+            float* d_bias = NULL;
+            float* d_pad_temp;
+            
+            int* d_pads;
+            int* d_edag;
+            int* d_kshape;
+            int* d_strides;
+            int* d_output_shape;
+            int* d_input_shape;
+    
             Conv(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
@@ -63,6 +74,9 @@ namespace cuda
             // cuda para
             int kernelpara_size = 8;
             int numElements = 0;
+            
+            float* d_A;
+            float* d_C;
 
             LeakyRelu(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};;
             void Execute() override;
@@ -78,6 +92,9 @@ namespace cuda
             int numElements = 0;
             int kernelpara_size = 4;
 
+            float* d_A;
+            float* d_C;
+
             Abs(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
             int SetKernelPara();
@@ -91,6 +108,9 @@ namespace cuda
             // cuda para
             int numElements = 0;
             int kernelpara_size = 4;
+
+            float* d_A;
+            float* d_C;
 
             Tanh(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
@@ -106,6 +126,10 @@ namespace cuda
             float add_value = 0;
             int kernelpara_size = 4;
             int numElements = 0;
+            
+            float* d_A;
+            float* d_B;
+            float* d_C;
 
             Add(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
@@ -121,6 +145,9 @@ namespace cuda
             float div_value = 1;
             int kernelpara_size = 4;
             int numElements = 0;
+            
+            float* d_A;
+            float* d_C;
 
             Div(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
             void Execute() override;
@@ -128,10 +155,6 @@ namespace cuda
             void printArgInfo();
     };
 };
-
-
-
-
 
 #endif // CUDAOP_H
 

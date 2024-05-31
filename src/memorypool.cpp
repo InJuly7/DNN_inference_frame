@@ -7,8 +7,8 @@
 #include "util.h"
 #include "memorypool.h"
 
-#define PRINT_MEMORYPOOL 0
-#define PRINT_TENSOROFFSET 0
+#define PRINT_MEMORYPOOL 1
+#define PRINT_TENSOROFFSET 1
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;

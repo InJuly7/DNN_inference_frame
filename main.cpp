@@ -25,6 +25,7 @@ std::map<std::string, size_t> paraOffsets;
 std::map<std::string, std::unique_ptr<cuda::Node>> cudaMap;
 size_t totalMemorySize = 0;
 size_t totalParaSize = 0;
+size_t max_pad_temp = 0;
 
 
 
@@ -41,7 +42,7 @@ int main()
     MemoryPoolImplementation();
     // 构建推理引擎
     BuildCudaOperator();
-
+    engine();
 
 
 

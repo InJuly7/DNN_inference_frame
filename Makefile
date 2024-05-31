@@ -2,29 +2,35 @@
 CXX = dlcc -x cuda
 CPP = g++
 
-CXX_FLAGS := --cuda-gpu-arch=dlgpuc64 -std=c++11
+CXX_FLAGS := --cuda-gpu-arch=dlgpuc64 -std=c++14 -fPIC -fpermissive -Wno-attributes
 CPP_FLAGS := -std=c++11
 
-INCLUDES := -I/dl/sdk/include -I/home/firefly/Tingshuo/op_test/include/
+INCLUDES := -I/dl/sdk/include -I../include -I/dl/sdk/include/dlnne
 
 ifeq ($(debug),1)
     CXX_FLAGS += -DDEBUG -g
 endif
 
-CU_SRCS = ../src/OpKernel.cu test_kernel.cu 
-CPP_SRCS = verify_kernel.cpp
+CU_SRCS = ../src/OpKernel.cu
+CPP_SRCS := \
+	main.cpp \
+    ../src/memorypool.cpp \
+    ../src/operator.cpp \
+    ../src/util.cpp \
+	../src/cudaop.cpp \
+    ../src/engine.cpp 
+    
 
-## 目标文件
+# 目标文件
 CU_OBJS = $(notdir $(CU_SRCS:.cu=.o))
 CPP_OBJS = $(notdir $(CPP_SRCS:.cpp=.o))
 
-EXECUTABLE = test_kernel
+EXECUTABLE = test
 
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(CU_OBJS) $(CPP_OBJS)
 	dlcc $^ -o $@
-	rm -f $(CU_OBJS) $(CPP_OBJS)
 
 %.o: ../src/%.cu
 	$(CXX) $< $(CXX_FLAGS) $(INCLUDES) -c -o $@
@@ -32,8 +38,11 @@ $(EXECUTABLE): $(CU_OBJS) $(CPP_OBJS)
 %.o: %.cu
 	$(CXX) $< $(CXX_FLAGS) $(INCLUDES) -c -o $@
 
-%.o: %.cpp
-	$(CPP) $< $(CPP_FLAGS) $(INCLUDES) -c -o $@
+%.o: ../src/%.cpp
+	$(CXX) $< $(CXX_FLAGS) $(INCLUDES) -c -o $@
+
+%.o: ../%.cpp
+	$(CXX) $< $(CXX_FLAGS) $(INCLUDES) -c -o $@
 
 clean:
 	rm -f $(EXECUTABLE) $(CU_OBJS) $(CPP_OBJS)

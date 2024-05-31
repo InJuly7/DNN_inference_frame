@@ -2,9 +2,8 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-#include "util.h"
-#include <algorithm>
 
+#include "util.h"
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0

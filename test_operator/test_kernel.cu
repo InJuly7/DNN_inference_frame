@@ -11,7 +11,7 @@ extern "C" __global__ void LeakyRelu(const float *A, const float B, float *C, in
 extern "C" __global__ void Abs(const float *A, float *C, int numElements);
 extern "C" __global__ void Div(const float *A, float div_const, float *C, int numElements);
 extern "C" __global__ void Tanh(const float *A, float *C, int numElements);
-
+extern "C" __global__ void ConcatNCHW(const float* A, int A_C, const float* B, int B_C, float* C,int H, int W);
 
 int main(int argc, char* argv[])
 {
@@ -129,12 +129,12 @@ int main(int argc, char* argv[])
         cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
         verify_TanhKernel(h_A,h_C,10);
     }
-    else if (strcmp(argv[1], "Slice") == 0)
-    {
-        int threadsPerBlock = 256;
-        int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
-        Slice<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_C, 2, 5, 3, numElements);  // Example parameters
-    }
+    // else if (strcmp(argv[1], "Slice") == 0)
+    // {
+    //     int threadsPerBlock = 256;
+    //     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    //     Slice<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_C, 2, 5, 3, numElements);  // Example parameters
+    // }
     else if (strcmp(argv[1], "Concat") == 0)
     {   
         h_C = (float*)malloc(2*size);

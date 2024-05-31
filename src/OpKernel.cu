@@ -8,7 +8,7 @@
 #include "OpKernel.cuh"
 
 
-__global__ void AddKernel_1(const float *A, const float add_const, float *C, int numElements)
+extern "C" __global__ void AddKernel_1(const float *A, const float add_const, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -17,7 +17,7 @@ __global__ void AddKernel_1(const float *A, const float add_const, float *C, int
     }
 }
 
-__global__ void AddKernel_2(const float *A, const float *B, float *C, int numElements)
+extern "C" __global__ void AddKernel_2(const float *A, const float *B, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -26,7 +26,7 @@ __global__ void AddKernel_2(const float *A, const float *B, float *C, int numEle
     }
 }
 
-__global__ void Div(const float *A, float div_const, float *C, int numElements)
+extern "C" __global__ void Div(const float *A, const float div_const, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -35,7 +35,7 @@ __global__ void Div(const float *A, float div_const, float *C, int numElements)
     }
 }
 
-__global__ void LeakyRelu(const float *A, const float alpha, float *C, int numElements)
+extern "C" __global__ void LeakyRelu(const float *A, const float alpha, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -45,7 +45,7 @@ __global__ void LeakyRelu(const float *A, const float alpha, float *C, int numEl
     }
 }
 
-__global__ void Abs(const float *A, float *C, int numElements)
+extern "C" __global__ void Abs(const float *A, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -54,7 +54,7 @@ __global__ void Abs(const float *A, float *C, int numElements)
     }
 }
 
-__global__ void Tanh(const float *A, float *C, int numElements)
+extern "C" __global__ void Tanh(const float *A, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numElements)
@@ -64,16 +64,16 @@ __global__ void Tanh(const float *A, float *C, int numElements)
     }
 }
 
-// extern "C" __global__ void Slice(const float *A, float *C, int src_block_size, int dst_block_size, 
-//                                                                             int offset, int num_blocks)
-// {
-//     for (int index = blockIdx.x * blockDim.x + threadIdx.x; index < (num_blocks * dst_block_size); index += blockDim.x * gridDim.x)
-//     {
-//         int chunk = index % dst_block_size;
-//         int block = index / dst_block_size;
-//         C[index] = A[block * src_block_size + chunk + offset];
-//     }
-// }
+extern "C" __global__ void Slice(const float *A, float *C, int src_block_size, int dst_block_size, 
+                                                                            int offset, int num_blocks)
+{
+    for (int index = blockIdx.x * blockDim.x + threadIdx.x; index < (num_blocks * dst_block_size); index += blockDim.x * gridDim.x)
+    {
+        int chunk = index % dst_block_size;
+        int block = index / dst_block_size;
+        C[index] = A[block * src_block_size + chunk + offset];
+    }
+}
 
 // extern "C" __global__ void Concat(const float *A, float *C, int numElements)
 // {
@@ -84,29 +84,29 @@ __global__ void Tanh(const float *A, float *C, int numElements)
 //     }
 // }
 
-// extern "C" __global__ void ConcatNCHW(const float* A, int A_C, const float* B, int B_C, float* C,int H, int W)
-// {
-//     int ix = threadIdx.x + blockIdx.x * blockDim.x; 
-//     int iy = threadIdx.y + blockIdx.y * blockDim.y; 
-// 
-//     if (ix<W && iy<H)
-//     {
-//         for (int c = 0; c < A_C + B_C; c++)
-//         {
-//             int idx = c*H*W + iy*W + ix;
-//             if (c < A_C)
-//             {
-//                 C[idx] = A[c*H*W + iy*W + ix];
-//             }
-//             else
-//             {
-//                 C[idx] = B[(c-A_C)*H*W + iy*W + ix];
-//             }
-//         }
-//     }
-// }
+extern "C" __global__ void ConcatNCHW(const float* A, int A_C, const float* B, int B_C, float* C,int H, int W)
+{
+    int ix = threadIdx.x + blockIdx.x * blockDim.x; 
+    int iy = threadIdx.y + blockIdx.y * blockDim.y; 
 
-__global__ void Conv2d(const float *A, float *C, const float *weight, int *pads, int *edag, 
+    if (ix<W && iy<H)
+    {
+        for (int c = 0; c < A_C + B_C; c++)
+        {
+            int idx = c*H*W + iy*W + ix;
+            if (c < A_C)
+            {
+                C[idx] = A[c*H*W + iy*W + ix];
+            }
+            else
+            {
+                C[idx] = B[(c-A_C)*H*W + iy*W + ix];
+            }
+        }
+    }
+}
+
+extern "C" __global__ void Conv2d(const float *A, float *C, const float *weight, int *pads, int *edag, 
                             int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape)
 {
     __shared__ float weight_s[16*1*3*3];
@@ -156,7 +156,7 @@ __global__ void Conv2d(const float *A, float *C, const float *weight, int *pads,
     }
 }
 
-__global__ void Conv2dg(const float *A, float *C, float *weight, int *pads, int *edag, 
+extern "C" __global__ void Conv2dg(const float *A, float *C, float *weight, int *pads, int *edag, 
         int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape, const float *bias)
 {
     __shared__ float weight_s[16*1*3*3];
@@ -219,7 +219,7 @@ __global__ void Conv2dg(const float *A, float *C, float *weight, int *pads, int 
     }
 }
 
-__global__ void Conv2db(const float *A, float *C, const float *weight, int *pads, int *edag,
+extern "C" __global__ void Conv2db(const float *A, float *C, const float *weight, int *pads, int *edag,
         int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape, const float *bias)
 {
     
@@ -310,7 +310,7 @@ void AbsKernel(const float *A, float *C, int numElements)
     cudaDeviceSynchronize();
 }
 
-void DivKernel(const float *A, const float *B, const float *C, const float div_const, int numElements)
+void DivKernel(const float *A, float *C, const float div_const, int numElements)
 {
     dim3 dimBlock = (256);
     dim3 dimGrid = ((numElements+256-1)/256);
@@ -318,7 +318,7 @@ void DivKernel(const float *A, const float *B, const float *C, const float div_c
     cudaDeviceSynchronize();
 }
 
-void AddKernel(const float *A, const float *B, const float *C, const float add_const, int numElements)
+void AddKernel(const float *A, const float *B, float *C, const float add_const, int numElements)
 {
     dim3 dimBlock = (256);
     dim3 dimGrid = ((numElements+256-1)/256);
@@ -338,14 +338,15 @@ void ConvKernel(const float *A, float *C, float *weight, int *pads, int *edag,
         int *outshape, int *kshape, int *strides, float *pad_temp, int *input_shape, int group,const float *bias)
 {
     dim3 dimBlock = (256);
-    dim3 dimGrid = ((numElements+256-1)/256);
+    int output_size = outshape[0] * outshape[1] * outshape[2] * outshape[3];
+    dim3 dimGrid = ((output_size+256-1)/256);
 
     if(group != 1)
     {
-        Conv2dg<<<dimGrid,dimBlock>>>(A,C,weight,pads,edag,outshape,kshape,strides,pad_temp,input_shape,bias)
+        Conv2dg<<<dimGrid,dimBlock>>>(A,C,weight,pads,edag,outshape,kshape,strides,pad_temp,input_shape,bias);
     }
     else
     {
-        Conv2db<<<dimGrid,dimBlock>>>(A,C,weight,pads,edag,outshape,kshape,strides,pad_temp,input_shape,bias)
+        Conv2db<<<dimGrid,dimBlock>>>(A,C,weight,pads,edag,outshape,kshape,strides,pad_temp,input_shape,bias);
     }
 }
