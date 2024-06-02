@@ -18,9 +18,16 @@ extern size_t totalParaSize;
 extern size_t totalMemorySize;
 extern size_t max_pad_temp;
 
+extern int input_vis_C;
+extern int input_ir_C;
+extern int input_H;
+extern int input_W;
+
 std::unordered_map<std::string, float*> graphinitMap;
 std::unordered_map<std::string, float*> cudainitMap;
 
+#define PRINTCUDAOP 0
+#define PRINTPARAOFFSET 0
 
 void BuildCudaOperator()
 {
@@ -35,7 +42,7 @@ void BuildCudaOperator()
         {
             const auto& CurrentOperator = operatorMap[operatorName];
             std::string opType = CurrentOperator->type;
-            if(opType == "Concat" || opType == "Slice") continue;
+            // if(opType == "Concat" || opType == "Slice") continue;
             CreateCudaOperator(opType,operatorName);
             auto& CudaOperator = cudaMap[operatorName];
             
@@ -84,7 +91,7 @@ void CreateCudaOperator(const std::string& opType, const std::string& operatorNa
     }
     else
     {
-        std::cout<<"CUDA算子库里没有该算子"<<std::endl;
+        cudaMap[operatorName] = std::make_unique<cuda::ConcreteNode>(opType,operatorName);
         flag = 0;
     }
     if(flag)
@@ -111,34 +118,45 @@ void PrintParaOffsets()
 
 void engine()
 {
-    float *cudaTensor_ptr, *cudaPara_ptr, *cudaPadTemp_ptr;; 
+    
+    float *cudaTensor_ptr, *cudaPara_ptr, *cudaPadTemp_ptr;
     cudaMalloc(&cudaTensor_ptr, totalMemorySize*sizeof(float));
     cudaMalloc(&cudaPara_ptr, totalParaSize*sizeof(float));
     cudaMalloc(&cudaPadTemp_ptr, max_pad_temp*sizeof(float));
 
     HostinitializeTensors();
+    writeArrayToFile(graphinitMap["vis"],input_H,input_W,"input_vis.txt");
+    writeArrayToFile(graphinitMap["ir"],input_H,input_W,"input_ir.txt");
     paraMemcpy(cudaTensor_ptr,cudaPara_ptr,cudaPadTemp_ptr);
-    
-
-    float* d_output_1;
-
     // 执行
     for(const auto& graph_node : topologicalOrder)
     {
         if(graph_node == "vis" || graph_node == "ir" || graph_node == "output_1") continue;
         auto& op_node = cudaMap[graph_node];
-        
         if(op_node->type == "Slice" || op_node->type == "Concat") continue;
         else
         {
             op_node->Execute();
         }
     }
-
+    
     size_t data_size = tensor_lifetimes["output_1"].tensor_size * sizeof(float);
-    cudaMemcpy(d_output_1, cudainitMap["output_1"], data_size, cudaMemcpyDeviceToHost);
-    writeArrayToFile(d_output_1, 480, 640, "output.txt");
+    cudaMemcpy(graphinitMap["output_1"], cudainitMap["output_1"], data_size, cudaMemcpyDeviceToHost);
+    writeArrayToFile(graphinitMap["output_1"],input_H,input_W,"output.txt");
+
+    freeHostTensors();
+    cudaFree(cudaTensor_ptr);
+    cudaFree(cudaPara_ptr);
+    cudaFree(cudaPadTemp_ptr);
 }   
+
+void freeHostTensors()
+{
+    for(auto it = graphinitMap.begin(); it != graphinitMap.end(); ++it)
+    {
+        free(it->second);
+    }
+}
 
 void HostinitializeTensors()
 {
@@ -149,18 +167,20 @@ void HostinitializeTensors()
     h_vis = (float*)malloc(tensor_lifetimes["vis"].tensor_size*sizeof(float));
     h_ir = (float*)malloc(tensor_lifetimes["ir"].tensor_size*sizeof(float));
     h_output_1 = (float*)malloc(tensor_lifetimes["output_1"].tensor_size*sizeof(float));
-
     // 数据初始化
     for (size_t i = 0; i < tensor_lifetimes["vis"].tensor_size; ++i)
     {
-        h_vis[i] = 1.0f;
-        h_ir[i]= 1.0f;
+        h_vis[i] = 1.0;
     }
-    
+    for (size_t i = 0; i < tensor_lifetimes["ir"].tensor_size; ++i)
+    {
+        h_ir[i]= 0.0;
+    }
     // 将指针存储在映射表中
     graphinitMap["vis"] = h_vis;
     graphinitMap["ir"] = h_ir;
     graphinitMap["output_1"] = h_output_1;
+    
 }
 
 void paraMemcpy(float* cudaTensor_ptr,float* cudaPara_ptr,float* cudaPadTemp_ptr)
@@ -169,6 +189,7 @@ void paraMemcpy(float* cudaTensor_ptr,float* cudaPara_ptr,float* cudaPadTemp_ptr
     // 将输入节点 vis 传入到GPU中
     for (const auto& graph_node : topologicalOrder)
     {
+        
         // 图的输入节点 将主机端的数据按照索引传递给GPU
         if(graph[graph_node].in_degree == 0)
         {
@@ -184,6 +205,7 @@ void paraMemcpy(float* cudaTensor_ptr,float* cudaPara_ptr,float* cudaPadTemp_ptr
                     cudaMemcpy(device_data_ptr, host_data_ptr, data_size, cudaMemcpyHostToDevice);
                 }
             }
+            continue;
         }
         // 输出节点 
         else if(graph[graph_node].dependents.empty())
@@ -194,9 +216,11 @@ void paraMemcpy(float* cudaTensor_ptr,float* cudaPara_ptr,float* cudaPadTemp_ptr
                 {
                     size_t output_idx = pair.first;
                     float* device_data_ptr = cudaTensor_ptr + output_idx; 
+                    
                     cudainitMap[graph_node] = device_data_ptr;
                 }
             }
+            continue;
         }
         //  算子
         const std::string op_type = operatorMap[graph_node]->type;
@@ -275,7 +299,7 @@ void paraMemcpy(float* cudaTensor_ptr,float* cudaPara_ptr,float* cudaPadTemp_ptr
             
             add_ptr->d_A = cudaTensor_ptr + add_ptr->inputs_idx[0];
             add_ptr->d_C = cudaTensor_ptr + add_ptr->outputs_idx[0];
-            (add_ptr->add_value == 0) ? add_ptr->d_B = NULL : add_ptr->d_B = cudaTensor_ptr + add_ptr->inputs_idx[1];
+            (add_ptr->add_value != 0) ? add_ptr->d_B = NULL : add_ptr->d_B = cudaTensor_ptr + add_ptr->inputs_idx[1];
         }
         else if(op_type == "LeakyRelu")
         {

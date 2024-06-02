@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/test.dir/main.cpp.o -o test   -L/dl/sdk/lib  -L/home/firefly/Tingshuo/op_test/build 

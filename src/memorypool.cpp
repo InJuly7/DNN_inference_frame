@@ -7,8 +7,8 @@
 #include "util.h"
 #include "memorypool.h"
 
-#define PRINT_MEMORYPOOL 1
-#define PRINT_TENSOROFFSET 1
+#define PRINT_MEMORYPOOL 0
+#define PRINT_TENSOROFFSET 0
 
 extern std::list<MemoryBlock> memoryPool;
 extern std::vector<std::string> topologicalOrder;
@@ -55,7 +55,6 @@ void MemoryPoolImplementation()
         processOutputTensor(operatorName,outputTensor);
         updateTensorOffsets();
         current_time++;
-
         if (PRINT_MEMORYPOOL)
         {
             printMemoryPool();
@@ -64,10 +63,10 @@ void MemoryPoolImplementation()
         inputTensors = {};
         outputTensor = {};
     }
+    calculateTotalMemorySize();
     if(PRINT_TENSOROFFSET)
     {
         printTensorOffsets();
-        calculateTotalMemorySize();
         std::cout << "TotalMemory: ";
         std::cout<<totalMemorySize<<std::endl;
     }
@@ -94,54 +93,6 @@ size_t calculateOffset(std::list<MemoryBlock>::iterator blockIt)
         offset += it->size;
     }
     return offset;
-}
-
-void processOperator(const std::string& operator_name, const std::vector<std::string>& inputTensors, const std::string& outputTensor,int current_time)
-{
-    // 图输入节点
-    if(graph[operator_name].in_degree == 0)
-    {
-        // 不需要找空闲块，在初始的时候直接分配
-        memoryPool.emplace_back(tensor_lifetimes[outputTensor].tensor_size, true, tensor_lifetimes[outputTensor].end_time, outputTensor);
-        return;
-    }
-
-    // 不需要执行的 算子节点 concat 
-    else if(operatorMap[operator_name]->type == "Concat")
-    {
-        coverageMemory(inputTensors,outputTensor);
-    }
-    
-    else if(canTensorBeOverwritten(operator_name,inputTensors,current_time))
-    {
-        // 需要执行的可覆盖算子节点, 每次执行完都需要考虑释放块的问题
-        if(operatorMap[operator_name]->type == "Slice")
-        {
-            coverageMemory(inputTensors,outputTensor);
-        }
-        // 单输入 直接覆盖
-        else if(operatorMap[operator_name]->type == "LeakyRelu" || 
-                operatorMap[operator_name]->type == "Abs" || 
-                operatorMap[operator_name]->type == "Tanh")
-        {
-            coverageMemory(inputTensors,outputTensor);
-        }
-
-        else if(operatorMap[operator_name]->type == "Add" || 
-                operatorMap[operator_name]->type == "Div")
-        {
-            coverageMemory(inputTensors,outputTensor);
-        }
-
-        freeMemory(current_time);
-    }
-    else if (operatorMap[operator_name]->type == "Conv")
-    {
-        allocateMemory(tensor_lifetimes[outputTensor].tensor_size,outputTensor);
-        freeMemory(current_time);
-    }
-
-
 }
 
 void processOutputTensor(const std::string& operator_name, std::string outputTensor)
@@ -306,6 +257,54 @@ void processOutputTensor(const std::string& operator_name, std::string outputTen
     }
 }
 
+void processOperator(const std::string& operator_name, const std::vector<std::string>& inputTensors, const std::string& outputTensor,int current_time)
+{
+    // 图输入节点
+    if(graph[operator_name].in_degree == 0)
+    {
+        // 不需要找空闲块，在初始的时候直接分配
+        memoryPool.emplace_back(tensor_lifetimes[outputTensor].tensor_size, true, tensor_lifetimes[outputTensor].end_time, outputTensor);
+        return;
+    }
+
+    // 不需要执行的 算子节点 concat 
+    else if(operatorMap[operator_name]->type == "Concat")
+    {
+        coverageMemory(inputTensors,outputTensor);
+    }
+    
+    else if(canTensorBeOverwritten(operator_name,inputTensors,current_time))
+    {
+        // 需要执行的可覆盖算子节点, 每次执行完都需要考虑释放块的问题
+        if(operatorMap[operator_name]->type == "Slice")
+        {
+            coverageMemory(inputTensors,outputTensor);
+        }
+        // 单输入 直接覆盖
+        else if(operatorMap[operator_name]->type == "LeakyRelu" || 
+                operatorMap[operator_name]->type == "Abs" || 
+                operatorMap[operator_name]->type == "Tanh")
+        {
+            coverageMemory(inputTensors,outputTensor);
+        }
+
+        else if(operatorMap[operator_name]->type == "Add" || 
+                operatorMap[operator_name]->type == "Div")
+        {
+            coverageMemory(inputTensors,outputTensor);
+        }
+
+        freeMemory(current_time);
+    }
+    else if (operatorMap[operator_name]->type == "Conv")
+    {
+        allocateMemory(tensor_lifetimes[outputTensor].tensor_size,outputTensor);
+        freeMemory(current_time);
+    }
+
+
+}
+
 bool canTensorBeOverwritten(const std::string& operator_name, const std::vector<std::string>& inputTensors, int current_time)
 {
     // 强依赖算子 算子类型为conv
@@ -437,6 +436,37 @@ void freeMemory(int releaseTime)
             }
         }
     }
+}
+
+void calculateTotalMemorySize()
+{
+    for (const auto& block : memoryPool)
+    {
+        totalMemorySize += block.size;
+    }
+}
+
+void updateOffsets(size_t insertPosition, size_t blockSize, const std::string& outputTensor)
+{
+    std::vector<std::pair<size_t, std::string>> toBeUpdated;
+
+    // 收集需要更新的元素
+    for (auto it = tensorOffsets.lower_bound(insertPosition); it != tensorOffsets.end(); ++it)
+    {
+        toBeUpdated.push_back({it->first + blockSize, it->second});
+    }
+
+    // 删除旧的元素
+    tensorOffsets.erase(tensorOffsets.lower_bound(insertPosition), tensorOffsets.end());
+
+    // 插入更新后的元素和新的Tensor
+    for (const auto& elem : toBeUpdated)
+    {
+        tensorOffsets.insert(elem);
+    }
+    
+    // 插入新的Tensor
+    tensorOffsets.insert(std::make_pair(insertPosition, outputTensor));
 }
 
 void coverageMemory(const std::vector<std::string>& inputTensors, const std::string& outputTensor)
@@ -579,29 +609,6 @@ void printMemoryPool()
     std::cout << "-------------------------------------------------------------------\n";
 }
 
-void updateOffsets(size_t insertPosition, size_t blockSize, const std::string& outputTensor)
-{
-    std::vector<std::pair<size_t, std::string>> toBeUpdated;
-
-    // 收集需要更新的元素
-    for (auto it = tensorOffsets.lower_bound(insertPosition); it != tensorOffsets.end(); ++it)
-    {
-        toBeUpdated.push_back({it->first + blockSize, it->second});
-    }
-
-    // 删除旧的元素
-    tensorOffsets.erase(tensorOffsets.lower_bound(insertPosition), tensorOffsets.end());
-
-    // 插入更新后的元素和新的Tensor
-    for (const auto& elem : toBeUpdated)
-    {
-        tensorOffsets.insert(elem);
-    }
-    
-    // 插入新的Tensor
-    tensorOffsets.insert(std::make_pair(insertPosition, outputTensor));
-}
-
 void updateTensorOffsets()
 {
     size_t currentOffset = 0;
@@ -643,10 +650,3 @@ void printTensorOffsets()
     std::cout << "---------------------\n";
 }
 
-void calculateTotalMemorySize()
-{
-    for (const auto& block : memoryPool)
-    {
-        totalMemorySize += block.size;
-    }
-}

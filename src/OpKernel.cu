@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <iostream>
 // CUDA runtime
 #include <cuda_runtime.h>
 #include <cuda.h>
@@ -324,11 +325,11 @@ void AddKernel(const float *A, const float *B, float *C, const float add_const, 
     dim3 dimGrid = ((numElements+256-1)/256);
     
     if(add_const == 0)
-    {
+    {   
         AddKernel_2<<<dimGrid,dimBlock>>>(A,B,C,numElements);
     }
     else
-    {
+    {   
         AddKernel_1<<<dimGrid,dimBlock>>>(A,add_const,C,numElements);
     }
     cudaDeviceSynchronize();

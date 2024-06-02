@@ -58,15 +58,18 @@ int main(int argc, char* argv[])
     }
     else if(strcmp(argv[1], "AddKernel_2") == 0)
     {
-        h_C = (float*)malloc(size);
-        cudaMalloc((void**)&d_C, size);
+        
 
         int threadsPerBlock = 256;
         int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 
         cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
         cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
+        h_C = (float*)malloc(size);
+        d_C = d_A;
+        // cudaMalloc((void**)&d_C, size);
         AddKernel_2<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, numElements);
+        cudaDeviceSynchronize();
         cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
         verify_AddKernel_2(h_A,h_B,h_C,10);
     }

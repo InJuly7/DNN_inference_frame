@@ -7,7 +7,7 @@
 
 #define PRINT_OP 0
 #define PRINT_GRAPH 0
-#define PRINT_TOPO 0
+#define PRINT_TOPO 1
 #define PRINT_TENSORLIFETIMES 0
 
 
@@ -15,6 +15,11 @@ extern std::map<std::string, std::unique_ptr<op::Node>> operatorMap;
 extern std::map<std::string, graphNode> graph;
 extern std::vector<std::string> topologicalOrder;
 extern std::unordered_map<std::string, TensorLifeSpan> tensor_lifetimes;
+
+extern int input_vis_C;
+extern int input_ir_C;
+extern int input_H;
+extern int input_W;
 
 
 std::vector<int> parseNumbers(const std::string& line)
@@ -504,10 +509,10 @@ std::vector<int> calculateOpOutputShape(const std::string& nodeName, const std::
 
 void Initialize_LifeSpan(TensorLifeSpan& lifespan)
 {
-    lifespan.end_time = INFINITY;
+    lifespan.end_time = 65535;
     lifespan.start_time = -1;
     lifespan.special_flag = false;
-    lifespan.tensor_size = INFINITY;
+    lifespan.tensor_size = 65535;
     lifespan.tensor_shape = {-1,-1,-1,-1};
 }
 
@@ -527,7 +532,7 @@ void BuildTensorLifetimes()
                 lifespan.start_time = time;
                 lifespan.special_flag = false;
                 // NCHW
-                lifespan.tensor_shape = {1,3,480,640};
+                lifespan.tensor_shape = {1,input_vis_C,input_H,input_W};
                 lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
             }
             else if(node_name == "ir")
@@ -535,7 +540,7 @@ void BuildTensorLifetimes()
                 lifespan.start_time = time;
                 lifespan.special_flag = false;
                 // NCHW
-                lifespan.tensor_shape = {1,1,480,640};
+                lifespan.tensor_shape = {1,input_ir_C,input_H,input_W};
                 lifespan.tensor_size = lifespan.tensor_shape[0]*lifespan.tensor_shape[1]*lifespan.tensor_shape[2]*lifespan.tensor_shape[3];
             }
             tensor_lifetimes[node_name] = lifespan;

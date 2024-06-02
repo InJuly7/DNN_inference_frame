@@ -6,9 +6,7 @@
 #include <map>
 #include <memory>
 
-#define PRINTKERNELPRARA 1
-#define PRINTCUDAOP 1
-#define PRINTPARAOFFSET 1
+
 
 namespace cuda
 {
@@ -19,7 +17,7 @@ namespace cuda
             std::string name;
             std::vector<int> inputs_idx;
             std::vector<int> outputs_idx;
-            int para_index;
+            int para_index = -1;
             
             Node(const std::string& Node_type, const std::string& Node_name);
             void PrintCudaNode();
@@ -28,6 +26,14 @@ namespace cuda
             virtual void printArgInfo() = 0;
     };
 
+    class ConcreteNode : public Node
+    {
+        public:
+        ConcreteNode(std::string Node_type,std::string Node_name) : Node(Node_type, Node_name) {};
+        void Execute(){}
+        int SetKernelPara(){}
+        void printArgInfo(){}
+    };
     class Conv : public Node
     {
         public:

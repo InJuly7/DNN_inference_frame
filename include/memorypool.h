@@ -20,7 +20,7 @@ void calculateTotalMemorySize();
 void MemoryPoolImplementation();
 
 void processOperator(const std::string &operator_name, const std::vector<std::string> &inputTensors, const std::string &outputTensor, int current_time);
-void processOutputTensor(const std::string &operator_name, std::string outputTensor);
+void processOutputTensor(const std::string& operator_name, std::string outputTensor);
 bool canTensorBeOverwritten(const std::string &operator_name, const std::vector<std::string> &inputTensors, int current_time);
 void allocateMemory(size_t size, std::string tensor_name);
 void freeMemory(int releaseTime);

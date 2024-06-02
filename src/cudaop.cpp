@@ -17,6 +17,11 @@ cuda::Node::Node(const std::string &Node_type, const std::string &Node_name)
 {
     type = Node_type;
     name = Node_name;
+    if (type == "Slice" || type == "Concat")
+    {
+        para_index = -1;
+        return;
+    }
     std::string output_tensor = getOutputTensor(Node_name);
     int input_size = graph[Node_name].inputs.size();
     for (const auto& pair : tensorOffsets)
@@ -56,16 +61,6 @@ void cuda::Node::PrintCudaNode()
     }
     std::cout<< "Para Index "<<para_index<<"\n";
     std::cout << "\n";
-}
-
-void cuda::Node::Execute()
-{
-
-}
-
-int cuda::Node::SetKernelPara()
-{
-    return -1;
 }
 
 // Conv
@@ -139,38 +134,34 @@ int cuda::Conv::SetKernelPara()
 
 void cuda::Conv::printArgInfo()
 {
-    if(PRINTKERNELPRARA)
-    {
-        // 打印所有变量
-        std::cout << "input_shape: ";
-        for (const auto& dim : input_shape) std::cout << dim << " ";
-        std::cout << std::endl;
+    // 打印所有变量
+    std::cout << "input_shape: ";
+    for (const auto& dim : input_shape) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "output_shape: ";
-        for (const auto& dim : output_shape) std::cout << dim << " ";
-        std::cout << std::endl;
+    std::cout << "output_shape: ";
+    for (const auto& dim : output_shape) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "pads: ";
-        for (const auto& dim : pads) std::cout << dim << " ";
-        std::cout << std::endl;
+    std::cout << "pads: ";
+    for (const auto& dim : pads) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "edag: ";
-        for (const auto& dim : edag) std::cout << dim << " ";
-        std::cout << std::endl;
+    std::cout << "edag: ";
+    for (const auto& dim : edag) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "kshape: ";
-        for (const auto& dim : kshape) std::cout << dim << " ";
-        std::cout << std::endl;
+    std::cout << "kshape: ";
+    for (const auto& dim : kshape) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "strides: ";
-        for (const auto& dim : strides) std::cout << dim << " ";
-        std::cout << std::endl;
+    std::cout << "strides: ";
+    for (const auto& dim : strides) std::cout << dim << " ";
+    std::cout << std::endl;
 
-        std::cout << "weight_size: " << weight_size << std::endl;
-        std::cout << "bias_size: " << bias_size << std::endl;
-        std::cout << "kernelpara_size: " << kernelpara_size << std::endl;
-    }
-
+    std::cout << "weight_size: " << weight_size << std::endl;
+    std::cout << "bias_size: " << bias_size << std::endl;
+    std::cout << "kernelpara_size: " << kernelpara_size << std::endl;
 }
 
 // Abs

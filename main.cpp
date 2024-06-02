@@ -27,7 +27,10 @@ size_t totalMemorySize = 0;
 size_t totalParaSize = 0;
 size_t max_pad_temp = 0;
 
-
+int input_vis_C = 3;
+int input_ir_C = 1;
+int input_H = 15;
+int input_W = 15;
 
 int main()
 {   
@@ -43,9 +46,6 @@ int main()
     // 构建推理引擎
     BuildCudaOperator();
     engine();
-
-
-
 
     return 0;
 }
