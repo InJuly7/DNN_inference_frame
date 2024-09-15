@@ -1,0 +1,5 @@
+Operator Name: /decode1/Div
+Operator Type: Div
+Inputs: /decode1/Tanh_output_0, /decode1/Constant_output_0
+Outputs: /decode1/Div_output_0
+

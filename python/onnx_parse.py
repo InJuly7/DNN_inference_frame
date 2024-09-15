@@ -51,7 +51,25 @@ model_path = "fusion11_5.onnx"
 model = onnx.load(model_path)
 
 # 提取并保存模型中所有算子的信息
-with open('../model_parameters.txt', 'w') as file:
+with open('../main/model_parameters.txt', 'w') as file:
+    # 写入图的输入节点信息
+    file.write("Model Inputs:\n")
+    for input_tensor in model.graph.input:
+        file.write(f"Input Name: {input_tensor.name}\n")
+        tensor_type = input_tensor.type.tensor_type
+        dims = [d.dim_value for d in tensor_type.shape.dim]
+        file.write(f"Shape: {dims}\n")
+    file.write("\n")
+    
+    # 写入图的输出节点信息
+    file.write("Model Outputs:\n")
+    for output_tensor in model.graph.output:
+        file.write(f"Output Name: {output_tensor.name}\n")
+        tensor_type = output_tensor.type.tensor_type
+        dims = [d.dim_value for d in tensor_type.shape.dim]
+        file.write(f"Shape: {dims}\n")
+    file.write("\n")
+    
     for node in model.graph.node:
         # 写入算子名称和类型
         file.write(f"Operator Name: {node.name}\n")

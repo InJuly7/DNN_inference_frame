@@ -1,0 +1,6 @@
+Model Inputs:
+Input Name: vis
+Shape: [1, 3, 480, 640]
+Input Name: ir
+Shape: [1, 1, 480, 640]
+

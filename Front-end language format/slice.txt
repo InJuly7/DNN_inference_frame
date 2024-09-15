@@ -1,0 +1,5 @@
+Operator Name: /Slice
+Operator Type: Slice
+Inputs: vis, /Constant_1_output_0, /Constant_2_output_0, /Constant_output_0, /Constant_3_output_0
+Outputs: /Slice_output_0
+

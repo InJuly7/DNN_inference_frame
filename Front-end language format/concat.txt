@@ -1,0 +1,6 @@
+Operator Name: /vis_rgbd1/dense/Concat
+Operator Type: Concat
+axis: 1
+Inputs: /vis_conv/LeakyRelu_output_0, /vis_rgbd1/dense/conv1/LeakyRelu_output_0
+Outputs: /vis_rgbd1/dense/Concat_output_0
+

@@ -1,0 +1,4 @@
+Model Outputs:
+Output Name: output_1
+Shape: [1, 1, 480, 640]
+

@@ -1,0 +1,5 @@
+Operator Name: /vis_rgbd1/sobelconv/Add
+Operator Type: Add
+Inputs: /vis_rgbd1/sobelconv/Abs_output_0, /vis_rgbd1/sobelconv/Abs_1_output_0
+Outputs: /vis_rgbd1/sobelconv/Add_output_0
+

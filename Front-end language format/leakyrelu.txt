@@ -1,0 +1,6 @@
+Operator Name: /vis_conv/LeakyRelu
+Operator Type: LeakyRelu
+alpha: 0.20000000298023224
+Inputs: /vis_conv/conv/Conv_output_0
+Outputs: /vis_conv/LeakyRelu_output_0
+

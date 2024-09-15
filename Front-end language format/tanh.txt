@@ -1,0 +1,5 @@
+Operator Name: /decode1/Tanh
+Operator Type: Tanh
+Inputs: /decode1/conv/Conv_output_0
+Outputs: /decode1/Tanh_output_0
+

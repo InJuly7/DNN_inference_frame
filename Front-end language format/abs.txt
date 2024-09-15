@@ -1,0 +1,5 @@
+Operator Name: /vis_rgbd1/sobelconv/Abs
+Operator Type: Abs
+Inputs: /vis_rgbd1/sobelconv/convx/Conv_output_0
+Outputs: /vis_rgbd1/sobelconv/Abs_output_0
+

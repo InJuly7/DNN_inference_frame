@@ -1,0 +1,6 @@
+Operator Name: /Constant
+Operator Type: Constant
+value: dims: [1], data_type: 7, raw_data: [1]
+Inputs: 
+Outputs: /Constant_output_0
+
